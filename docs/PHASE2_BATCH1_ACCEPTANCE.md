@@ -13,7 +13,7 @@ This acceptance document certifies the full remediation and adversarial security
 
 Following the secondary adversarial security audit, 5 critical/major security vulnerabilities (SEC-01 through SEC-05) and incomplete deliverables were flagged. A complete, genuine remediation was performed across both microservices without facades or hardcoding. 
 
-- **Test Suite Results**: 36 automated security and unit test cases executed across `identity-service` and `listing-service`, achieving **100% PASS (0 Failures, 0 Errors, 0 Skipped)**.
+- **Test Suite Results**: 37 automated security and unit test cases executed across `identity-service` and `listing-service`, achieving **100% PASS (0 Failures, 0 Errors, 0 Skipped)**.
 - **Reactor Build**: Full multi-module Maven reactor (`pom.xml` across all 9 modules) compiles cleanly with zero warnings or errors on Java 21 LTS (`mvn test-compile` -> BUILD SUCCESS).
 - **Frontend Build**: React 18 + Vite 5 + Tailwind CSS SPA compiles cleanly for production (`npm run build` -> built in 1.94s, zero errors).
 - **Microservice Isolation**: Complete architectural isolation across the 6 MySQL database schemas (`stu_identity_db`, `stu_listing_db`, `stu_interaction_db`, `stu_transaction_db`, `stu_moderation_db`, `stu_billing_db`) with **0 cross-database foreign keys** and **0 cross-database JOIN queries**.
@@ -23,16 +23,22 @@ Following the secondary adversarial security audit, 5 critical/major security vu
 ## 2. Security Vulnerability Remediations (SEC-01 to SEC-05)
 
 ### SEC-01: Moderation Bypass via `HIDDEN` State in `listing-service`
-- **Vulnerability**: A seller could transition a draft or unapproved listing to `HIDDEN` and subsequently to `PUBLISHED`, completely bypassing the mandatory moderator review process.
-- **Root Cause**: `ListingService.java` permitted `DRAFT -> HIDDEN` and subsequently `HIDDEN -> PUBLISHED` without verifying prior moderator approval.
+- **Vulnerability**: A seller could transition a draft or unapproved listing to `HIDDEN` and subsequently to `PUBLISHED`, completely bypassing the mandatory moderator review process. Furthermore, if an approved listing was hidden (`HIDDEN`) and edited, prior logic failed to reset status to `PENDING_REVIEW` or clear `publishedAt`, allowing edited content to be republished without re-moderation.
+- **Root Cause**: `ListingService.java` permitted `DRAFT -> HIDDEN` and subsequently `HIDDEN -> PUBLISHED` without verifying prior moderator approval, and `updateListing` only triggered re-moderation when current status was `PUBLISHED`.
 - **Remediation**:
   - In `ListingService.java::updateSellerStatus`:
     - Strict transition rules enforced:
       1. Transition to `HIDDEN` is **strictly prohibited** unless current status is `PUBLISHED` (or `SOLD`). Any attempt from `DRAFT`, `PENDING_REVIEW`, or `REJECTED` throws `AppException(ErrorCode.LISTING_STATUS_INVALID)`.
       2. Transition from `HIDDEN` back to `PUBLISHED` is **strictly prohibited** unless the listing was previously reviewed and approved by a moderator (`listing.getPublishedAt() != null`). Attempting to unhide an unapproved listing throws `AppException(ErrorCode.LISTING_NOT_APPROVED)`.
       3. Direct transition to `PUBLISHED` from `DRAFT`, `PENDING_REVIEW`, or `REJECTED` throws `AppException(ErrorCode.LISTING_STATUS_INVALID)`.
-      4. Editing a `PUBLISHED` listing automatically resets its status back to `PENDING_REVIEW`, clearing `publishedAt` to force re-moderation of altered content.
-- **Verification**: Covered by `ListingSecuritySuiteTest` (5 distinct tests verifying each illegal state transition).
+  - In `ListingService.java::updateListing`:
+    - Evaluates `requiresModeration = listing.getStatus() == ListingStatus.PUBLISHED || listing.getStatus() == ListingStatus.HIDDEN`.
+    - If `requiresModeration` is true:
+      1. Preserves `previousStatus` (`PUBLISHED` or `HIDDEN`).
+      2. Automatically resets status to `ListingStatus.PENDING_REVIEW`.
+      3. Clears `publishedAt` to `null` to mandate fresh moderator approval before republication.
+      4. Saves status transition audit history with `fromStatus = previousStatus` and `toStatus = PENDING_REVIEW`.
+- **Verification**: Covered by `ListingSecuritySuiteTest` (6 distinct tests verifying each illegal state transition and edit re-moderation edge case).
 
 ---
 
@@ -115,7 +121,8 @@ Following the secondary adversarial security audit, 5 critical/major security vu
 | **ListingSecuritySuiteTest** | `testUpdateSellerStatus_DraftToHidden_Forbidden` | SEC-01 | Rejects seller hiding unapproved DRAFT listing | 400 BAD_REQUEST (2004) | **PASS** |
 | **ListingSecuritySuiteTest** | `testUpdateSellerStatus_UnapprovedHiddenToPublished_Forbidden` | SEC-01 | Rejects unhiding listing if publishedAt == null | 400 BAD_REQUEST (2007) | **PASS** |
 | **ListingSecuritySuiteTest** | `testUpdateSellerStatus_ApprovedHiddenToPublished_Succeeds` | SEC-01 | Permits unhiding listing if previously approved | 200 OK | **PASS** |
-| **ListingSecuritySuiteTest** | `testUpdateListing_PublishedItem_ResetsToPendingReview` | SEC-01 | Editing published listing resets status to PENDING_REVIEW | 200 OK | **PASS** |
+| **ListingSecuritySuiteTest** | `testUpdateListing_PublishedItem_ResetsToPendingReview` | SEC-01 | Editing published listing resets status to PENDING_REVIEW and clears publishedAt | 200 OK | **PASS** |
+| **ListingSecuritySuiteTest** | `testUpdateListing_HiddenItem_ResetsToPendingReviewAndClearsPublishedAt` | SEC-01 Edge | Editing hidden listing resets status to PENDING_REVIEW and clears publishedAt | 200 OK | **PASS** |
 | **ListingSecuritySuiteTest** | `testGetListingById_StrangerViewingPending_ThrowsNotFound` | SEC-03 | Stranger cannot view unpublished listing | 404 NOT_FOUND (2001) | **PASS** |
 | **ListingSecuritySuiteTest** | `testGetListingById_OwnerOrModerator_Succeeds` | SEC-03 | Seller and Moderator can view unpublished listing | 200 OK | **PASS** |
 | **ListingSecuritySuiteTest** | `testSearchListings_PublicQuery_OnlyPublished` | SEC-03 | Public search forces status=PUBLISHED ignoring query param | 200 OK | **PASS** |
@@ -190,7 +197,7 @@ dist/assets/index-CREtwlIJ.js   152.68 kB
 - [x] SEC-03 Public search leaks prevented by unconditionally forcing `ListingStatus.PUBLISHED`.
 - [x] SEC-04 Locked and disabled accounts blocked immediately with HTTP 403 Forbidden.
 - [x] SEC-05 User enumeration in password reset prevented via generic response envelope.
-- [x] 36 automated security and unit tests pass with 0 failures and 0 errors.
+- [x] 37 automated security and unit tests pass with 0 failures and 0 errors.
 - [x] Multi-module reactor and React frontend compile cleanly with 100% BUILD SUCCESS.
 - [x] Database isolation invariants maintained across all 6 schemas.
 

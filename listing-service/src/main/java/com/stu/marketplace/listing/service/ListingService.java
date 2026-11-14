@@ -136,17 +136,19 @@ public class ListingService {
             }
         }
 
-        boolean wasPublished = listing.getStatus() == ListingStatus.PUBLISHED;
-        if (wasPublished) {
+        boolean requiresModeration = listing.getStatus() == ListingStatus.PUBLISHED || listing.getStatus() == ListingStatus.HIDDEN;
+        String previousStatus = listing.getStatus().name();
+        if (requiresModeration) {
             listing.setStatus(ListingStatus.PENDING_REVIEW);
+            listing.setPublishedAt(null);
         }
 
         listing = listingRepository.save(listing);
 
-        if (wasPublished) {
+        if (requiresModeration) {
             historyRepository.save(ListingStatusHistory.builder()
                     .listing(listing)
-                    .fromStatus(ListingStatus.PUBLISHED.name())
+                    .fromStatus(previousStatus)
                     .toStatus(ListingStatus.PENDING_REVIEW.name())
                     .actorId(currentUserId)
                     .reason("Listing updated by seller - submitted for re-moderation")

@@ -198,8 +198,28 @@ public class ListingSecuritySuiteTest {
 
         assertNotNull(response);
         assertEquals(ListingStatus.PENDING_REVIEW, response.getStatus());
+        assertNull(publishedListing.getPublishedAt());
         verify(historyRepository).save(argThat(h ->
                 "PENDING_REVIEW".equals(h.getToStatus()) && "PUBLISHED".equals(h.getFromStatus())));
+    }
+
+    @Test
+    @DisplayName("SEC-01 Edge: Editing HIDDEN listing resets status to PENDING_REVIEW and clears publishedAt")
+    void testUpdateListing_HiddenItem_ResetsToPendingReviewAndClearsPublishedAt() {
+        when(listingRepository.findById(103L)).thenReturn(Optional.of(hiddenListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(i -> i.getArgument(0));
+
+        UpdateListingRequest updateRequest = UpdateListingRequest.builder()
+                .title("Sách C++ Nâng Cao Đã Sửa")
+                .build();
+
+        ListingResponse response = listingService.updateListing(103L, 10L, updateRequest);
+
+        assertNotNull(response);
+        assertEquals(ListingStatus.PENDING_REVIEW, response.getStatus());
+        assertNull(hiddenListing.getPublishedAt());
+        verify(historyRepository).save(argThat(h ->
+                "PENDING_REVIEW".equals(h.getToStatus()) && "HIDDEN".equals(h.getFromStatus())));
     }
 
     @Test
