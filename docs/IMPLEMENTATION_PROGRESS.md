@@ -11,7 +11,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 | Pha (Phase) | Tên Pha | Trạng Thái | Tiến Độ | Tài liệu nghiệm thu |
 |---|---|---|---|---|
 | **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
-| **Phase 2** | **Core Domain Microservices & JPA Persistence** | **HOÀN THÀNH ĐỢT 1 (Identity & Listing Services)** | 100% Đợt 1 | [`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
+| **Phase 2** | **Core Domain Microservices & JPA Persistence** | **NGHIỆM THU ĐỢT 1 THÀNH CÔNG (SEC-01 to SEC-05 Remediated)** | 100% Đợt 1 (36/36 Tests Pass) | [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md)<br>[`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 3** | Business Interactions, Campus Meetups & Moderation | Chưa bắt đầu | 0% | TBD |
 | **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
 
@@ -121,3 +121,12 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 - [x] Live Runtime Probe qua Gateway (8080): Đăng ký user thật, đăng nhập lấy JWT thật, xem profile `GET /users/me`, lấy danh mục, tạo tin đăng mới kèm ảnh, xem `my-listings`, xem chi tiết tin đăng, gửi hồ sơ xác minh sinh viên.
 - [x] Tài liệu hợp đồng API: `docs/API_CONTRACTS.md`.
 - [x] Báo cáo kỹ thuật chi tiết: `docs/PHASE2_IMPLEMENTATION_REPORT.md`.
+
+### 4. Báo Cáo Khắc Phục Lỗ Hổng Bảo Mật & Nghiệm Thu Đợt 1 (SEC-01 to SEC-05 Remediation)
+- [x] **SEC-01**: Khắc phục Moderation Bypass qua trạng thái `HIDDEN` trong `listing-service` (kiểm tra `publishedAt != null`, cấm DRAFT -> HIDDEN, trả về `LISTING_NOT_APPROVED`).
+- [x] **SEC-02**: Bảo vệ PII sinh viên qua DTO `PublicUserProfileResponse` (loại bỏ email, SĐT, studentCode ở endpoint công khai), bảo vệ `GET /api/v1/users/{id}` qua `@PreAuthorize`.
+- [x] **SEC-03**: Ngăn chặn rò rỉ tin chưa kiểm duyệt trong tìm kiếm công khai `GET /api/v1/listings` (ép buộc vô điều kiện `status = PUBLISHED` với người dùng ẩn danh / sinh viên).
+- [x] **SEC-04**: Chặn tài khoản bị khóa/vô hiệu hóa bypass JWT trong `JwtAuthenticationFilter` (kiểm tra `isAccountNonLocked()` và `isEnabled()`, ngắt filter chain trả về HTTP 403 Forbidden).
+- [x] **SEC-05**: Chống tấn công dò quét người dùng (User Enumeration) ở chức năng quên mật khẩu (trả về HTTP 200 thông điệp chung thống nhất).
+- [x] Bộ kiểm thử bảo mật tự động: 36/36 tests đạt 100% PASS (18 tests `identity-service`, 18 tests `listing-service`).
+- [x] Tài liệu nghiệm thu chi tiết: [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md).

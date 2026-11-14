@@ -43,6 +43,7 @@ public class JwtTokenProvider {
                 .subject(userPrincipal.getId().toString())
                 .claim("email", userPrincipal.getEmail())
                 .claim("studentCode", userPrincipal.getStudentCode())
+                .claim("accountStatus", userPrincipal.getAccountStatus() != null ? userPrincipal.getAccountStatus().name() : "ACTIVE")
                 .claim("roles", roles)
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -90,16 +91,10 @@ public class JwtTokenProvider {
                     .build()
                     .parseSignedClaims(token);
             return true;
-        } catch (SecurityException | MalformedJwtException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
-        } catch (ExpiredJwtException e) {
-            log.error("Expired JWT token: {}", e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            log.error("Unsupported JWT token: {}", e.getMessage());
-        } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("Invalid JWT token: {}", e.getMessage());
+            return false;
         }
-        return false;
     }
 
     public long getExpirationMs() {

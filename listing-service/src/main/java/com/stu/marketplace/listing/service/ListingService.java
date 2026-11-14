@@ -16,6 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -134,7 +136,23 @@ public class ListingService {
             }
         }
 
+        boolean wasPublished = listing.getStatus() == ListingStatus.PUBLISHED;
+        if (wasPublished) {
+            listing.setStatus(ListingStatus.PENDING_REVIEW);
+        }
+
         listing = listingRepository.save(listing);
+
+        if (wasPublished) {
+            historyRepository.save(ListingStatusHistory.builder()
+                    .listing(listing)
+                    .fromStatus(ListingStatus.PUBLISHED.name())
+                    .toStatus(ListingStatus.PENDING_REVIEW.name())
+                    .actorId(currentUserId)
+                    .reason("Listing updated by seller - submitted for re-moderation")
+                    .build());
+        }
+
         return mapToResponse(listing);
     }
 
@@ -202,14 +220,28 @@ public class ListingService {
             throw new AppException(ErrorCode.UNAUTHORIZED_LISTING_ACTION);
         }
 
-        // Sellers cannot directly publish listings without moderator review
-        if (request.getStatus() == ListingStatus.PUBLISHED && listing.getStatus() != ListingStatus.HIDDEN) {
-            throw new AppException(ErrorCode.LISTING_STATUS_INVALID);
-        }
-
-        // Allowed seller transitions: HIDDEN, SOLD, or unhiding back to PUBLISHED
-        if (request.getStatus() != ListingStatus.HIDDEN && request.getStatus() != ListingStatus.SOLD
-                && request.getStatus() != ListingStatus.PUBLISHED) {
+        // Allowed seller transitions:
+        // 1. HIDDEN: Only allowed if current status is PUBLISHED.
+        // 2. PUBLISHED (unhiding): Only allowed if current status is HIDDEN AND listing was previously approved by moderator (publishedAt != null).
+        // 3. SOLD: Only allowed if current status is PUBLISHED or HIDDEN.
+        // Direct transition to PUBLISHED without prior approval is rejected with LISTING_NOT_APPROVED.
+        // All other illegal transitions reject with LISTING_STATUS_INVALID.
+        if (request.getStatus() == ListingStatus.HIDDEN) {
+            if (listing.getStatus() != ListingStatus.PUBLISHED) {
+                throw new AppException(ErrorCode.LISTING_STATUS_INVALID);
+            }
+        } else if (request.getStatus() == ListingStatus.PUBLISHED) {
+            if (listing.getStatus() != ListingStatus.HIDDEN) {
+                throw new AppException(ErrorCode.LISTING_STATUS_INVALID);
+            }
+            if (listing.getPublishedAt() == null) {
+                throw new AppException(ErrorCode.LISTING_NOT_APPROVED);
+            }
+        } else if (request.getStatus() == ListingStatus.SOLD) {
+            if (listing.getStatus() != ListingStatus.PUBLISHED && listing.getStatus() != ListingStatus.HIDDEN) {
+                throw new AppException(ErrorCode.LISTING_STATUS_INVALID);
+            }
+        } else {
             throw new AppException(ErrorCode.LISTING_STATUS_INVALID);
         }
 
@@ -266,6 +298,11 @@ public class ListingService {
 
     @Transactional(readOnly = true)
     public PagedResponse<ListingResponse> searchListings(ListingFilterRequest filter) {
+        return searchListings(filter, false);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<ListingResponse> searchListings(ListingFilterRequest filter, boolean isStaff) {
         Sort.Direction direction = "ASC".equalsIgnoreCase(filter.getSortDir()) ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortBy = StringUtils.hasText(filter.getSortBy()) ? filter.getSortBy() : "createdAt";
         Pageable pageable = PageRequest.of(Math.max(0, filter.getPage()), Math.max(1, filter.getSize()), Sort.by(direction, sortBy));
@@ -273,9 +310,8 @@ public class ListingService {
         Specification<Listing> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // By default, public search only returns PUBLISHED listings unless explicitly filtered
-            ListingStatus status = filter.getStatus() != null ? filter.getStatus() : ListingStatus.PUBLISHED;
-            predicates.add(cb.equal(root.get("status"), status));
+            // Public catalog search unconditionally enforces PUBLISHED status; client query status is completely ignored
+            predicates.add(cb.equal(root.get("status"), ListingStatus.PUBLISHED));
 
             if (StringUtils.hasText(filter.getKeyword())) {
                 String pattern = "%" + filter.getKeyword().trim().toLowerCase() + "%";
@@ -320,6 +356,22 @@ public class ListingService {
     public PagedResponse<ListingResponse> getMyListings(Long sellerId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Listing> listingPage = listingRepository.findBySellerIdOrderByCreatedAtDesc(sellerId, pageable);
+
+        List<ListingResponse> content = listingPage.getContent().stream().map(this::mapToResponse).toList();
+        return PagedResponse.<ListingResponse>builder()
+                .content(content)
+                .page(listingPage.getNumber())
+                .size(listingPage.getSize())
+                .totalElements(listingPage.getTotalElements())
+                .totalPages(listingPage.getTotalPages())
+                .last(listingPage.isLast())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<ListingResponse> getPendingListings(int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Listing> listingPage = listingRepository.findByStatusOrderByCreatedAtDesc(ListingStatus.PENDING_REVIEW, pageable);
 
         List<ListingResponse> content = listingPage.getContent().stream().map(this::mapToResponse).toList();
         return PagedResponse.<ListingResponse>builder()

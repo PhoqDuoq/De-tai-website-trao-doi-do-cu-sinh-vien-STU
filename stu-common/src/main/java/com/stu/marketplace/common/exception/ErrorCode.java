@@ -35,6 +35,8 @@ public enum ErrorCode {
     VERIFICATION_NOT_FOUND(1011, "Student verification request not found", HttpStatus.NOT_FOUND),
     INVALID_RESET_TOKEN(1012, "Password reset token is invalid or has expired", HttpStatus.BAD_REQUEST),
     REFRESH_TOKEN_NOT_FOUND(1013, "Refresh token not found or revoked", HttpStatus.UNAUTHORIZED),
+    ACCOUNT_LOCKED(1014, "User account is locked or suspended", HttpStatus.FORBIDDEN),
+    ACCOUNT_DISABLED(1015, "User account is disabled", HttpStatus.FORBIDDEN),
 
     // Listing Service (2000 - 2999)
     LISTING_NOT_FOUND(2001, "Listing item not found", HttpStatus.NOT_FOUND),
@@ -43,6 +45,7 @@ public enum ErrorCode {
     LISTING_STATUS_INVALID(2004, "Cannot transition listing to requested status", HttpStatus.BAD_REQUEST),
     MAX_IMAGES_EXCEEDED(2005, "Maximum number of listing images exceeded", HttpStatus.BAD_REQUEST),
     CATEGORY_SLUG_EXISTS(2006, "Category with this slug already exists", HttpStatus.CONFLICT),
+    LISTING_NOT_APPROVED(2007, "Listing must be reviewed and approved by a moderator before publishing", HttpStatus.BAD_REQUEST),
 
     // Interaction Service (3000 - 3999)
     CONVERSATION_NOT_FOUND(3001, "Conversation not found", HttpStatus.NOT_FOUND),

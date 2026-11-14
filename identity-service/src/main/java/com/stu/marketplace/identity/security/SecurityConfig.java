@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/public", "/api/v1/users/{id}/public").permitAll()
                         .requestMatchers("/api/v1/students/verifications/{id}/review").hasAnyRole("ADMIN", "MODERATOR")
                         .requestMatchers("/api/v1/students/verifications").hasAnyRole("ADMIN", "MODERATOR")
                         .anyRequest().authenticated()

@@ -3,6 +3,7 @@ package com.stu.marketplace.identity.service;
 import com.stu.marketplace.common.exception.AppException;
 import com.stu.marketplace.common.exception.ErrorCode;
 import com.stu.marketplace.identity.dto.request.UpdateProfileRequest;
+import com.stu.marketplace.identity.dto.response.PublicUserProfileResponse;
 import com.stu.marketplace.identity.dto.response.UserProfileResponse;
 import com.stu.marketplace.identity.entity.User;
 import com.stu.marketplace.identity.repository.UserRepository;
@@ -23,6 +24,27 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         return authService.mapToProfileResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(Long targetUserId, Long requestingUserId, boolean isPrivileged) {
+        if (!isPrivileged && (requestingUserId == null || !requestingUserId.equals(targetUserId))) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+        return getProfile(targetUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public PublicUserProfileResponse getPublicProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return PublicUserProfileResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .verificationStatus(user.getVerificationStatus())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 
     @Transactional

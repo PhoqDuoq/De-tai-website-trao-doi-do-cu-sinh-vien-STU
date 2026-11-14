@@ -26,6 +26,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -178,8 +179,25 @@ public class AuthService {
 
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        Optional<User> userOpt = userRepository.findByEmail(request.getEmail().trim().toLowerCase());
+        if (userOpt.isEmpty()) {
+            log.info("Password reset requested for non-existent email: {}", request.getEmail());
+            return null;
+        }
+
+        User user = userOpt.get();
+        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+            log.info("Password reset requested for non-active user: {}", user.getEmail());
+            return null;
+        }
+
+        // Rate limiting check: reject if a reset token was requested within the last 2 minutes
+        Optional<PasswordResetToken> recentTokenOpt = passwordResetTokenRepository
+                .findTopByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId());
+        if (recentTokenOpt.isPresent() && recentTokenOpt.get().getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(2))) {
+            log.warn("Rate limit: Password reset requested too soon for user: {}", user.getEmail());
+            return null;
+        }
 
         String rawToken = tokenProvider.generateRawRefreshToken();
         PasswordResetToken resetToken = PasswordResetToken.builder()

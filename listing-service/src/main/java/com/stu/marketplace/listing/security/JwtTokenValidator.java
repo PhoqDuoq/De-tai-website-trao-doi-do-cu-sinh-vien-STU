@@ -37,6 +37,15 @@ public class JwtTokenValidator {
             Long userId = Long.parseLong(claims.getSubject());
             String email = claims.get("email", String.class);
             String studentCode = claims.get("studentCode", String.class);
+            String accountStatus = claims.get("accountStatus", String.class);
+            if (accountStatus == null) {
+                accountStatus = "ACTIVE";
+            }
+
+            if (!"ACTIVE".equalsIgnoreCase(accountStatus)) {
+                log.warn("Rejected JWT token for non-active user ID {} (status: {})", userId, accountStatus);
+                return null;
+            }
 
             List<?> rawRoles = claims.get("roles", List.class);
             Collection<SimpleGrantedAuthority> authorities = Collections.emptyList();
@@ -50,6 +59,7 @@ public class JwtTokenValidator {
                     .id(userId)
                     .email(email)
                     .studentCode(studentCode)
+                    .accountStatus(accountStatus)
                     .authorities(authorities)
                     .build();
         } catch (JwtException | IllegalArgumentException e) {

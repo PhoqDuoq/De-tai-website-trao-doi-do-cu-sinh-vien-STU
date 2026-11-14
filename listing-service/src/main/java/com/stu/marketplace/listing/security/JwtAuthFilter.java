@@ -32,11 +32,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (StringUtils.hasText(jwt)) {
                 UserPrincipal principal = tokenValidator.parseToken(jwt);
                 if (principal != null) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    if (!principal.isEnabled() || !principal.isAccountNonLocked()) {
+                        log.warn("Blocked request from non-active user principal: ID {}", principal.getId());
+                    } else {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
             }
         } catch (Exception ex) {

@@ -16,6 +16,7 @@ public class UserPrincipal implements UserDetails {
     private final Long id;
     private final String email;
     private final String studentCode;
+    private final String accountStatus;
     private final Collection<? extends GrantedAuthority> authorities;
 
     @Override
@@ -40,7 +41,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !"LOCKED".equalsIgnoreCase(accountStatus) && !"SUSPENDED".equalsIgnoreCase(accountStatus);
     }
 
     @Override
@@ -50,6 +51,6 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return "ACTIVE".equalsIgnoreCase(accountStatus);
     }
 }

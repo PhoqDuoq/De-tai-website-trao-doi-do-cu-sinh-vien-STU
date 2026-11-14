@@ -20,8 +20,14 @@ public class ListingController {
     private final ListingService listingService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<PagedResponse<ListingResponse>>> searchListings(ListingFilterRequest filter) {
-        PagedResponse<ListingResponse> response = listingService.searchListings(filter != null ? filter : new ListingFilterRequest());
+    public ResponseEntity<ApiResponse<PagedResponse<ListingResponse>>> searchListings(
+            ListingFilterRequest filter,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        boolean isStaff = userPrincipal != null && userPrincipal.getAuthorities() != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_MODERATOR"));
+        PagedResponse<ListingResponse> response = listingService.searchListings(
+                filter != null ? filter : new ListingFilterRequest(),
+                isStaff);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -43,6 +49,15 @@ public class ListingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         PagedResponse<ListingResponse> response = listingService.getMyListings(userPrincipal.getId(), page, size);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/pending")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    public ResponseEntity<ApiResponse<PagedResponse<ListingResponse>>> getPendingListings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PagedResponse<ListingResponse> response = listingService.getPendingListings(page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

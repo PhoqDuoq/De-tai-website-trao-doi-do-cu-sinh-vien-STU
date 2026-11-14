@@ -1,10 +1,14 @@
 package com.stu.marketplace.identity.controller;
 
 import com.stu.marketplace.common.dto.ApiResponse;
+import com.stu.marketplace.common.exception.AppException;
+import com.stu.marketplace.common.exception.ErrorCode;
 import com.stu.marketplace.identity.dto.request.*;
 import com.stu.marketplace.identity.dto.response.AuthResponse;
+import com.stu.marketplace.identity.dto.response.UserProfileResponse;
 import com.stu.marketplace.identity.security.UserPrincipal;
 import com.stu.marketplace.identity.service.AuthService;
+import com.stu.marketplace.identity.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +24,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserService userService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
@@ -48,10 +53,19 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }
 
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+        if (userPrincipal == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UserProfileResponse response = userService.getProfile(userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<Map<String, String>>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        String resetToken = authService.forgotPassword(request);
-        return ResponseEntity.ok(ApiResponse.success("Password reset instructions sent", Map.of("resetToken", resetToken)));
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("If the account exists, a reset link has been dispatched", null));
     }
 
     @PostMapping("/reset-password")

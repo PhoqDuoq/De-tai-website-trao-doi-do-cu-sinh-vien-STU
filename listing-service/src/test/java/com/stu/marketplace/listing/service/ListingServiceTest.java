@@ -40,10 +40,7 @@ class ListingServiceTest {
     @Mock
     private ListingStatusHistoryRepository historyRepository;
 
-    @Mock
     private CategoryService categoryService;
-
-    @InjectMocks
     private ListingService listingService;
 
     private Category sampleCategory;
@@ -51,6 +48,9 @@ class ListingServiceTest {
 
     @BeforeEach
     void setUp() {
+        categoryService = new CategoryService(categoryRepository);
+        listingService = new ListingService(listingRepository, categoryRepository, imageRepository, historyRepository, categoryService);
+
         sampleCategory = Category.builder()
                 .id(1L)
                 .name("Giáo trình & Tài liệu")
