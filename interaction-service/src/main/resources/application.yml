@@ -1,0 +1,34 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: interaction-service
+  datasource:
+    # Dedicated database: stu_interaction_db on WampServer MySQL (Port 3306)
+    # Architectural Invariant: Strict database isolation. No cross-database FKs or joins.
+    # User and listing references stored as scalar user_id, sender_id, listing_id.
+    url: ${DB_INTERACTION_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/stu_interaction_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

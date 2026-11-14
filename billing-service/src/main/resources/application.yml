@@ -1,0 +1,35 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: billing-service
+  datasource:
+    # Dedicated database: stu_billing_db on WampServer MySQL (Port 3306)
+    # Architectural Invariant: Strict database isolation. No cross-database FKs or joins.
+    # SCOPE CONSTRAINT: Platform listing fees & boost packages ONLY.
+    # Student-to-student payments are strictly prohibited in this service.
+    url: ${DB_BILLING_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/stu_billing_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
