@@ -1,19 +1,19 @@
 # Implementation Progress Tracker — STU Marketplace
 
 Dự án: **Sàn Trao Đổi Đồ Dùng Cũ STU (Monorepo Microservices)**  
-Thời gian cập nhật: **2026-11-14**  
-Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023.0.3 | Vite 5 + React 18 + Tailwind CSS 3 | MySQL 8+ on WampServer**
+Thời gian cập nhật: **2026-11-14T22:28:00+07:00**  
+Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023.0.3 | Vite 5 + React 18 + Tailwind CSS 3 | MySQL 8.4+ on WampServer**
 
 ---
 
 ## Tổng Quan Tiến Độ Các Pha (Phase Overview)
 
-| Pha (Phase) | Tên Pha | Trạng Thái | Tiến Độ |
-|---|---|---|---|
-| **Phase 1** | **Project Foundation & Monorepo Architecture** | **HOÀN THÀNH (100%)** | 10/10 Deliverables |
-| **Phase 2** | Core Domain Microservices & JPA Persistence | Chưa bắt đầu (Sẵn sàng triển khai) | 0% |
-| **Phase 3** | Business Interactions, Campus Meetups & Moderation | Chưa bắt đầu | 0% |
-| **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% |
+| Pha (Phase) | Tên Pha | Trạng Thái | Tiến Độ | Tài liệu nghiệm thu |
+|---|---|---|---|---|
+| **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
+| **Phase 2** | Core Domain Microservices & JPA Persistence | Sẵn sàng triển khai | 0% | Kế hoạch triển khai Phase 2 |
+| **Phase 3** | Business Interactions, Campus Meetups & Moderation | Chưa bắt đầu | 0% | TBD |
+| **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
 
 ---
 
@@ -21,7 +21,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 
 ### 1. R1: Baseline Workspace & Environment Audit
 - [x] Khởi tạo Git repository và cấu hình `.gitignore` chuẩn hóa đa công nghệ (Java, Node, Vite, IDE, OS).
-- [x] Rà soát và ghi nhận hiện trạng ban đầu của thư mục làm việc (trước đó trống rỗng, không có tài liệu hay DDL pre-existing).
+- [x] Rà soát và ghi nhận hiện trạng ban đầu của thư mục làm việc.
 - [x] Kiểm định các công cụ môi trường cục bộ:
   - Java 21 LTS: OpenJDK 64-Bit Server VM Temurin-21.0.13+9
   - Maven: Apache Maven 3.9.11
@@ -72,16 +72,16 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
   - Chỉ thu phí đăng tin và gói đẩy bài viết cho người bán (`fee_packages`, `invoices`, `payment_transactions`).
   - Tuyệt đối không cung cấp ví trung gian hay xử lý luồng thanh toán tiền giữa sinh viên với sinh viên.
 
-### 5. R4: Tài Liệu Hóa & Kiểm Định Tính Xác Thực (Verification)
+### 5. R4: Tài Liệu Hóa & Kiểm Định Runtime Thực Tế (Runtime Verification)
 - [x] `README.md` hướng dẫn tổng thể, sơ đồ kiến trúc, port directory, thiết lập môi trường và lệnh chạy.
 - [x] `.env.example` liệt kê đầy đủ cấu hình cổng, chuỗi kết nối JDBC, thông tin xác thực MySQL WampServer và secret JWT.
-- [x] Tạo 6 tệp DDL chuẩn hóa tại `docs/database/`:
-  - `stu_identity_db.sql`
-  - `stu_listing_db.sql`
-  - `stu_interaction_db.sql`
-  - `stu_transaction_db.sql`
-  - `stu_moderation_db.sql`
-  - `stu_billing_db.sql`
+- [x] Tạo 6 tệp DDL chuẩn hóa tại `docs/database/` và đối chiếu an toàn với 6 database có sẵn trên WampServer MySQL (không xóa/ghi đè).
 - [x] Biên dịch thực tế xác thực:
-  - `mvn clean compile`: 100% BUILD SUCCESS trên Java 21 (9/9 modules).
-  - `npm run build`: Hoàn tất không cảnh báo lỗi cú pháp.
+  - `mvn clean verify`: 100% BUILD SUCCESS trên Java 21 (9/9 modules, 39.891 s).
+  - `npm run build`: Hoàn tất trong 1.46 s tạo static bundle tại `frontend/dist/`.
+- [x] Kiểm tra Runtime đồng thời toàn hệ thống:
+  - API Gateway Netty (8080) và 6 Microservices (8081 - 8086) khởi động đồng thời, JPA init thành công, Actuator status đạt `UP`.
+  - Frontend Vite (5173) khởi động trong 273 ms, phản hồi HTTP 200 OK.
+  - CORS preflight phản hồi HTTP 200 OK cho origin `http://localhost:5173`.
+  - Vite proxy `/api` chuyển tiếp chính xác qua Gateway đến các microservice.
+  - Toàn bộ kết quả được ghi nhận chi tiết tại `docs/PHASE1_RUNTIME_VERIFICATION.md`.
