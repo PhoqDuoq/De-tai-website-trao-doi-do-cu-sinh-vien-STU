@@ -1,0 +1,7 @@
+package com.stu.marketplace.listing.entity;
+
+public enum ItemCondition {
+    NEW,
+    LIKE_NEW,
+    USED
+}

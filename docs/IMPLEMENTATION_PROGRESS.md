@@ -11,7 +11,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 | Pha (Phase) | Tên Pha | Trạng Thái | Tiến Độ | Tài liệu nghiệm thu |
 |---|---|---|---|---|
 | **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
-| **Phase 2** | Core Domain Microservices & JPA Persistence | Sẵn sàng triển khai | 0% | Kế hoạch triển khai Phase 2 |
+| **Phase 2** | **Core Domain Microservices & JPA Persistence** | **HOÀN THÀNH ĐỢT 1 (Identity & Listing Services)** | 100% Đợt 1 | [`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 3** | Business Interactions, Campus Meetups & Moderation | Chưa bắt đầu | 0% | TBD |
 | **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
 
@@ -85,3 +85,39 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
   - CORS preflight phản hồi HTTP 200 OK cho origin `http://localhost:5173`.
   - Vite proxy `/api` chuyển tiếp chính xác qua Gateway đến các microservice.
   - Toàn bộ kết quả được ghi nhận chi tiết tại `docs/PHASE1_RUNTIME_VERIFICATION.md`.
+
+---
+
+## Chi Tiết Hạng Mục Giai Đoạn 2 — Đợt 1 (Phase 2 Deliverables Breakdown: Identity & Listing)
+
+### 1. Identity Service (Port 8081 — `stu_identity_db`)
+- [x] JPA Entities: `User`, `Role`, `StudentVerification`, `RefreshToken`, `PasswordResetToken` (chuẩn hóa `char(64)` cho token hash).
+- [x] Spring Data JPA Repositories: `UserRepository`, `RoleRepository`, `StudentVerificationRepository`, `RefreshTokenRepository`, `PasswordResetTokenRepository`.
+- [x] DTOs & Validation: `RegisterRequest`, `LoginRequest`, `RefreshTokenRequest`, `ForgotPasswordRequest`, `ResetPasswordRequest`, `StudentVerificationRequest`, `VerificationReviewRequest`, `UpdateProfileRequest`, `AuthResponse`, `UserProfileResponse`, `StudentVerificationResponse`.
+- [x] Spring Security 6 & JWT HMAC-SHA512: `JwtTokenProvider`, `JwtAuthenticationFilter`, `JwtAuthenticationEntryPoint` (chuẩn hóa envelope 401), `SecurityConfig` (Stateless).
+- [x] Nghiệp vụ AuthService: Đăng ký sinh viên, đăng nhập, Token Rotation, thu hồi token, quên mật khẩu.
+- [x] Nghiệp vụ UserService: Lấy thông tin tài khoản và cập nhật profile.
+- [x] Nghiệp vụ StudentVerificationService: Gửi hồ sơ thẻ sinh viên (`MANUAL_REVIEW`, `INSTITUTION_API`) và xét duyệt cho Moderator.
+- [x] Cấu hình `spring.jpa.hibernate.ddl-auto=validate` đạt 100% khớp schema MySQL `stu_identity_db`.
+- [x] Kiểm thử: 5 Unit tests (`AuthServiceTest`), 2 Integration tests (`AuthControllerIntegrationTest`) -> 7/7 tests passed.
+
+### 2. Listing Service (Port 8082 — `stu_listing_db`)
+- [x] JPA Entities: `Category`, `Listing`, `ListingImage` (`smallint unsigned` sortOrder), `ListingStatusHistory`.
+- [x] Spring Data JPA Repositories: `CategoryRepository`, `ListingRepository` (kèm `JpaSpecificationExecutor` cho multi-criteria search), `ListingImageRepository`, `ListingStatusHistoryRepository`.
+- [x] DTOs & Validation: `CategoryDto`, `CreateCategoryRequest`, `ListingImageDto`, `CreateListingRequest`, `UpdateListingRequest`, `ListingResponse`, `ListingDetailResponse`, `ListingStatusHistoryDto`, `ListingStatusUpdateRequest`, `ListingFilterRequest`, `PagedResponse`.
+- [x] Spring Security & JWT: `JwtTokenValidator`, `JwtAuthFilter`, `JwtAuthenticationEntryPoint` (chuẩn hóa envelope 401), `SecurityConfig`.
+- [x] Nghiệp vụ CategoryService: Truy vấn danh mục hoạt động, thêm danh mục cho Admin.
+- [x] Nghiệp vụ ListingService:
+  - Đăng tin mới (gán sellerId từ token, tạo lịch sử ban đầu DRAFT hoặc PENDING_REVIEW).
+  - Cập nhật tin đăng (kiểm tra nghiêm ngặt quyền sở hữu `listing.sellerId == currentUserId`).
+  - Lọc động đa tiêu chí (keyword, category, price range, condition) và phân trang chuẩn.
+  - Quản lý trạng thái: Người bán chuyển PENDING_REVIEW, HIDDEN, SOLD; chặn người bán tự ý PUBLISHED.
+  - Quy trình kiểm duyệt: Moderator phê duyệt PUBLISHED hoặc REJECTED kèm lý do.
+- [x] Cấu hình `spring.jpa.hibernate.ddl-auto=validate` đạt 100% khớp schema MySQL `stu_listing_db`.
+- [x] Kiểm thử: 5 Unit tests (`ListingServiceTest`), 3 Integration tests (`ListingControllerIntegrationTest`) -> 8/8 tests passed.
+
+### 3. Monorepo Verification & Live Gateway Probing
+- [x] `mvn clean verify`: 100% BUILD SUCCESS trên toàn bộ 9/9 modules (34.155 s).
+- [x] Live Runtime Probe qua Gateway (8080): Đăng ký user thật, đăng nhập lấy JWT thật, xem profile `GET /users/me`, lấy danh mục, tạo tin đăng mới kèm ảnh, xem `my-listings`, xem chi tiết tin đăng, gửi hồ sơ xác minh sinh viên.
+- [x] Tài liệu hợp đồng API: `docs/API_CONTRACTS.md`.
+- [x] Báo cáo kỹ thuật chi tiết: `docs/PHASE2_IMPLEMENTATION_REPORT.md`.

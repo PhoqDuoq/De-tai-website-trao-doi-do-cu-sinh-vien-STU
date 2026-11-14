@@ -23,13 +23,18 @@ public enum ErrorCode {
 
     // Identity Service (1000 - 1999)
     USER_NOT_FOUND(1001, "User profile not found", HttpStatus.NOT_FOUND),
-    USER_ALREADY_EXISTS(1002, "User with this email or student ID already exists", HttpStatus.CONFLICT),
+    USER_ALREADY_EXISTS(1002, "User with this email already exists", HttpStatus.CONFLICT),
     INVALID_CREDENTIALS(1003, "Invalid email or password", HttpStatus.UNAUTHORIZED),
     UNVERIFIED_STUDENT(1004, "Student identity card has not been verified yet", HttpStatus.FORBIDDEN),
     STUDENT_ID_INVALID(1005, "Student ID format is invalid", HttpStatus.BAD_REQUEST),
     TOKEN_EXPIRED(1006, "JWT authentication token has expired", HttpStatus.UNAUTHORIZED),
     TOKEN_INVALID(1007, "JWT authentication token signature is invalid", HttpStatus.UNAUTHORIZED),
     ACCOUNT_SUSPENDED(1008, "User account is suspended or banned", HttpStatus.FORBIDDEN),
+    STUDENT_CODE_ALREADY_EXISTS(1009, "Student ID code is already registered", HttpStatus.CONFLICT),
+    VERIFICATION_ALREADY_SUBMITTED(1010, "Student verification is already submitted or verified", HttpStatus.CONFLICT),
+    VERIFICATION_NOT_FOUND(1011, "Student verification request not found", HttpStatus.NOT_FOUND),
+    INVALID_RESET_TOKEN(1012, "Password reset token is invalid or has expired", HttpStatus.BAD_REQUEST),
+    REFRESH_TOKEN_NOT_FOUND(1013, "Refresh token not found or revoked", HttpStatus.UNAUTHORIZED),
 
     // Listing Service (2000 - 2999)
     LISTING_NOT_FOUND(2001, "Listing item not found", HttpStatus.NOT_FOUND),
@@ -37,6 +42,7 @@ public enum ErrorCode {
     UNAUTHORIZED_LISTING_ACTION(2003, "User is not authorized to edit or delete this listing", HttpStatus.FORBIDDEN),
     LISTING_STATUS_INVALID(2004, "Cannot transition listing to requested status", HttpStatus.BAD_REQUEST),
     MAX_IMAGES_EXCEEDED(2005, "Maximum number of listing images exceeded", HttpStatus.BAD_REQUEST),
+    CATEGORY_SLUG_EXISTS(2006, "Category with this slug already exists", HttpStatus.CONFLICT),
 
     // Interaction Service (3000 - 3999)
     CONVERSATION_NOT_FOUND(3001, "Conversation not found", HttpStatus.NOT_FOUND),
