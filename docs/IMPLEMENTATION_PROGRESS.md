@@ -14,7 +14,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 | **Phase 2** | **Core Domain Microservices & JPA Persistence** | **NGHIỆM THU ĐỢT 1 THÀNH CÔNG (SEC-01 to SEC-05 Remediated)** | 100% Đợt 1 (36/36 Tests Pass) | [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md)<br>[`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 3** | **Business Interactions, Campus Meetups, Moderation & Billing** | **HOÀN THÀNH TOÀN DIỆN (ĐỢT 1 & ĐỢT 2 HOÀN TẤT - 133/133 TESTS PASS)** | 100% Phase 3 (Đợt 1: 77 tests + Đợt 2: 56 tests) | [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Milestone 5** | **Backend Runtime End-to-End Verification** | **NGHIỆM THU HOÀN TOÀN (48/48 E2E JOURNEYS PASS - 7/7 SERVICES UP)** | 100% (7 Services + Gateway, Zero P2P, SOLD Sync, Boost) | [`docs/BACKEND_RUNTIME_VERIFICATION.md`](BACKEND_RUNTIME_VERIFICATION.md) |
-| **Phase 4** | Full Integration, Frontend SPA & Verification | Sẵn sàng triển khai | 0% | TBD |
+| **Phase 4** | **React Frontend Monorepo & Auth / Student Verification System** | **HOÀN THÀNH ĐỢT 1 (PHASE 4 BATCH 1 - BUILD SUCCESS)** | 100% Phase 4 Batch 1 (Build Clean, 0 Error, Zero Mock) | [`frontend/`](../frontend/) |
 
 ---
 
@@ -257,3 +257,61 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 - Toàn bộ 56 tests mới của Đợt 2 (31 Moderation + 25 Billing) đều PASS 100%.
 - Không vi phạm nguyên tắc cách ly dữ liệu: 0 cross-database foreign keys, 0 cross-database joins.
 - Định tuyến API Gateway (`api-gateway/src/main/resources/application.yml` Route 5 và Route 6) ăn khớp 100% với các controller endpoints.
+
+---
+
+## Chi Tiết Hạng Mục Giai Đoạn 4 — Đợt 1 (Phase 4 Batch 1: Frontend Monorepo Foundation & Auth System)
+
+### 1. Tooling & Dependencies
+- [x] Cài đặt và tích hợp chuẩn hóa các dependencies: `react` (18.3.1), `react-dom` (18.3.1), `react-router-dom` (6.27.0), `axios` (1.7.7), `lucide-react` (0.453.0), `zod` (4.6.7), `react-hook-form` (7.92.0), `@hookform/resolvers` (7.0.6), `clsx` (2.1.1), `tailwind-merge` (3.7.0).
+- [x] Cấu hình alias `@/*` trỏ về `frontend/src/*` tại `frontend/vite.config.js` và `frontend/jsconfig.json`.
+- [x] Tiện ích định dạng và kết hợp class tại `frontend/src/lib/utils.js`: `cn(...)`, `formatVND(...)`, `formatDate(...)`, `hasRole(...)`.
+
+### 2. Axios Gateway Client & Quản Lý Vòng Đời JWT (Token Rotation)
+- [x] Khởi tạo `frontend/src/api/client.js`:
+  - Kết nối chuẩn API Gateway tại `http://localhost:8080`.
+  - Request Interceptor tự động gắn `Authorization: Bearer <accessToken>`.
+  - Response Interceptor bắt mã HTTP 401 Unauthorized, xếp hàng đợi và gọi `POST /api/v1/auth/refresh` với `{ "refreshToken": ... }` để luân chuyển token và retry tự động các request đang chờ. Nếu refresh thất bại, xóa storage và chuyển hướng an toàn về `/login`.
+  - Hàm trích xuất thông điệp lỗi trực quan `extractErrorMessage(...)` hỗ trợ phong bì chuẩn `ApiResponse<T>` và lỗi validation.
+- [x] Khởi tạo `frontend/src/api/authApi.js`: `login`, `register`, `refreshToken`, `logout`, `getProfile`, `updateProfile`, `forgotPassword`, `resetPassword`.
+- [x] Khởi tạo `frontend/src/api/studentApi.js`: `submitVerification`, `getMyVerifications`, `getPendingVerifications`, `reviewVerification`.
+
+### 3. Quản Lý Trạng Thái Toàn Cục (State Management)
+- [x] Khởi tạo `frontend/src/contexts/AuthContext.jsx` & `frontend/src/hooks/useAuth.js`: Quản lý `user`, `accessToken`, `isLoading`, `isAuthenticated`, cung cấp `login`, `register`, `logout`, `verifyStudent`, `refreshProfile`. Lưu trữ đồng bộ tại `localStorage`.
+- [x] Khởi tạo `frontend/src/contexts/ToastContext.jsx` & `frontend/src/hooks/useToast.js`: Hệ thống thông báo toast responsive (success, error, warning, info) thuần Tailwind CSS và Lucide icons.
+
+### 4. Thư Viện Thành Phần UI Tái Sử Dụng (UI Component Library)
+- [x] `frontend/src/components/ui/Button.jsx`: Đầy đủ variants (`primary` STU blue, `secondary`, `outline`, `destructive`, `ghost`, `accent` STU orange), kích thước (sm, md, lg, icon), trạng thái loading.
+- [x] `frontend/src/components/ui/Input.jsx`: Label, icon tiền tố/hậu tố, thông báo lỗi kiểm tra, helper text, tích hợp `forwardRef` cho React Hook Form.
+- [x] `frontend/src/components/ui/Card.jsx`: `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`.
+- [x] `frontend/src/components/ui/Badge.jsx`: Huy hiệu trạng thái xác minh (`VERIFIED` xanh lục, `PENDING` vàng cam, `REJECTED` đỏ) và huy hiệu phân quyền vai trò (`STUDENT`, `MODERATOR`, `ADMIN`).
+- [x] `frontend/src/components/ui/Spinner.jsx`: Spinner xoay tải trang đa kích thước theo màu nhận diện STU.
+
+### 5. Khung Giao Diện Các Cổng (Portal Layouts & Navigation)
+- [x] `frontend/src/layouts/StudentLayout.jsx`: Thanh điều hướng STU Marketplace, ô tìm kiếm thông minh, nút "Đăng tin", icon tin nhắn/thông báo, menu tài khoản người dùng, menu responsive trên mobile, và footer chính thức của trường STU (180 Cao Lỗ, Quận 8).
+- [x] `frontend/src/layouts/ModeratorLayout.jsx`: Topbar nhận diện Kiểm duyệt viên, sidebar liên kết tới: Tổng quan kiểm duyệt, Xác minh sinh viên, Kiểm duyệt tin đăng, Báo cáo vi phạm, Từ khóa cấm, Lịch sử kiểm duyệt.
+- [x] `frontend/src/layouts/AdminLayout.jsx`: Topbar nhận diện Quản trị viên, sidebar liên kết tới: Tổng quan hệ thống, Quản lý người dùng, Danh mục hàng hoá, Gói phí đăng tin, Thống kê hệ thống.
+- [x] `frontend/src/layouts/AuthLayout.jsx`: Bố cục chia đôi màn hình hiện đại (cột trái: banner nhận diện thương hiệu STU, giá trị cốt lõi & tiêu chí an toàn; cột phải: form xác thực đặt giữa).
+
+### 6. Các Trang Xác Thực & Đăng Ký Sinh Viên (Auth Pages)
+- [x] `frontend/src/pages/auth/LoginPage.jsx`: Đăng nhập bằng Email STU hoặc Mã số sinh viên (MSSV), mật khẩu, toggle ẩn/hiện mật khẩu, xử lý lỗi API thực tế, chuyển hướng sau đăng nhập.
+- [x] `frontend/src/pages/auth/RegisterPage.jsx`: Đăng ký tài khoản sinh viên (Họ tên, MSSV, Email @stu.edu.vn, SĐT, Mật khẩu), kiểm tra hợp lệ bằng Zod schema, thông báo thành công.
+- [x] `frontend/src/pages/auth/VerifyStudentPage.jsx`: Nộp minh chứng ảnh thẻ sinh viên, phương thức xác minh (`MANUAL_REVIEW`), mã số sinh viên, hiển thị huy hiệu trạng thái xác minh, bảng lịch sử các lần nộp.
+- [x] `frontend/src/pages/auth/ForgotPasswordPage.jsx`: Nhập email tài khoản, thông điệp phản hồi chống rò rỉ người dùng (Anti-enumeration), điều hướng quay lại đăng nhập.
+
+### 7. Trang Chủ Sàn & Bảng Điều Khiển Các Cổng
+- [x] `frontend/src/pages/student/HomePage.jsx`: Trang chủ sàn giao dịch sinh viên STU với hero banner, lưới danh mục ngành đào tạo & dụng cụ học tập, danh sách tin đăng nổi bật, 3 tiêu chí an toàn (100% SV STU, Hẹn gặp tại trường, Xác nhận 2 chiều).
+- [x] `frontend/src/pages/moderator/ModeratorDashboard.jsx`: Bảng điều khiển kiểm duyệt viên với thẻ thống kê, danh sách hồ sơ xác minh thẻ sinh viên thực tế (gọi API thật `studentApi.getPendingVerifications()`), nút Phê duyệt / Từ chối có nhập ghi chú.
+- [x] `frontend/src/pages/admin/AdminDashboard.jsx`: Bảng điều khiển quản trị viên với các chỉ số tổng thể, bảng theo dõi sức khỏe kết nối 6 microservices & API Gateway (Port 8080-8086), lối tắt quản lý nhanh.
+- [x] `frontend/src/pages/NotFoundPage.jsx` & `frontend/src/pages/UnauthorizedPage.jsx`: Trang 404 và 403 tiếng Việt chuẩn mực.
+
+### 8. Định Tuyến & Rào Chắn Phân Quyền (RBAC Routing Guards)
+- [x] `frontend/src/routes/ProtectedRoute.jsx`: Kiểm tra phiên đăng nhập, tài khoản khóa/đình chỉ (`LOCKED`/`SUSPENDED`), phân quyền vai trò (`allowedRoles`), và điều kiện đã xác thực sinh viên (`requireVerifiedStudent`).
+- [x] `frontend/src/routes/AppRoutes.jsx`: Cây định tuyến phân bổ theo 3 cổng (Student, Moderator, Admin) và luồng xác thực độc lập.
+- [x] `frontend/src/App.jsx`: Tích hợp `BrowserRouter`, `ToastProvider`, `AuthProvider`, `AppRoutes`.
+
+### 9. Kiểm Định Biên Dịch Thực Tế (Build Verification)
+- [x] Lệnh biên dịch: `npm --prefix frontend run build`
+- [x] Kết quả: **BUILD SUCCESS (Code 0, built in 3.13s)**. Static bundle được tạo tại `frontend/dist/` (HTML: 0.57 kB, CSS: 36.76 kB, JS: 488.56 kB).
+- [x] Không có lỗi cú pháp, không có broken imports, 100% tiếng Việt tự nhiên và giao diện đáp ứng (responsive).
+
