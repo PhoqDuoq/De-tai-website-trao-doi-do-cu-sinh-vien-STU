@@ -182,6 +182,22 @@ class TransactionServiceTest {
     }
 
     @Test
+    @DisplayName("scheduleMeetup should throw BAD_REQUEST when meetup location is not an approved STU campus location")
+    void testScheduleMeetup_InvalidLocation_ThrowsBadRequest() {
+        sampleTransaction.setStatus(TransactionStatus.ACCEPTED);
+        when(transactionRepository.findById(1L)).thenReturn(Optional.of(sampleTransaction));
+
+        MeetupScheduleRequest request = MeetupScheduleRequest.builder()
+                .meetingLocation("Off-campus warehouse, Dist 8")
+                .meetingTime(LocalDateTime.now().plusDays(1))
+                .build();
+
+        assertThatThrownBy(() -> transactionService.scheduleMeetup(10L, 1L, request))
+                .isInstanceOf(AppException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("confirmTransaction with valid verification code should transition to COMPLETED and sync SOLD")
     void testConfirmTransaction_Success_WithVerificationCode() {
         sampleTransaction.setStatus(TransactionStatus.CONFIRMED);

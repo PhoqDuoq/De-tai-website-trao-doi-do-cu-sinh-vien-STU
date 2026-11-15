@@ -177,4 +177,20 @@ class ListingServiceTest {
         verify(listingRepository).save(any(Listing.class));
         verify(historyRepository).save(any(ListingStatusHistory.class));
     }
+
+    @Test
+    @DisplayName("Should synchronize listing status to SOLD via internal service call")
+    void testSyncListingSold_Success() {
+        sampleListing.setStatus(ListingStatus.PUBLISHED);
+        when(listingRepository.findById(100L)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ListingResponse response = listingService.syncListingSold(100L, "Sold via transaction handover");
+
+        assertNotNull(response);
+        assertEquals(ListingStatus.SOLD, response.getStatus());
+        assertNotNull(response.getSoldAt());
+        verify(listingRepository).save(any(Listing.class));
+        verify(historyRepository).save(argThat(h -> "SOLD".equals(h.getToStatus())));
+    }
 }

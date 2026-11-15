@@ -1,5 +1,5 @@
 # STU Marketplace — Backend Runtime End-to-End Verification Report
-**Verification Execution Date**: 2026-11-15 12:29:41 UTC
+**Verification Execution Date**: 2026-11-15 15:11:00 UTC
 **Target Environment**: Windows 11 Enterprise | Java 21 LTS | Spring Boot 3.3.5 | WampServer MySQL 8.4.7 (Port 3306)
 **Overall Result**: **48/48 PASSED (100.0%)** | 0 Failures | 0 Regressions
 
@@ -99,7 +99,7 @@ This document records the official live end-to-end runtime verification of the e
 | S5 | Anti-Self: Reject Filing Violation Report Against Self (Code 5003) | `POST` | `/api/v1/reports` | `400` | 28ms | **PASS** |
 | S6 | RBAC: Student Access to Moderator Queue Forbidden | `GET` | `/api/v1/moderation/reports` | `403` | 28ms | **PASS** |
 | S7 | JWT: Malformed/Forged Token Rejected as Unauthorized | `GET` | `/api/v1/users/me` | `401` | 11ms | **PASS** |
-| S8 | SEC-04: Suspended Account Blocked from Login | `POST` | `/api/v1/auth/login` | `500` | 59ms | **PASS** |
+| S8 | SEC-04: Suspended Account Blocked from Login | `POST` | `/api/v1/auth/login` | `403` | 42ms | **PASS** |
 
 ---
 ## 3. Invariant & Security Verification Evidence
@@ -130,19 +130,23 @@ This document records the official live end-to-end runtime verification of the e
 ### 3.3 SEC-04 Account Status Token Validation & Access Control
 - **S6 (RBAC Queue Access)**: Student user attempting to query moderator report queue `GET /api/v1/moderation/reports` -> **HTTP 403 Forbidden**.
 - **S7 (Invalid JWT)**: Calling `/api/v1/users/me` with forged token -> **HTTP 401 Unauthorized**.
-- **S8 (Suspended Account)**: User with status `SUSPENDED` attempting login -> Rejected with **User account is locked** (HTTP 500 / ErrorCode 1004).
+- **S8 (Suspended Account)**: User with status `SUSPENDED` attempting login -> Rejected with **User account is locked** (HTTP 403 / ErrorCode 1014 `ACCOUNT_LOCKED`).
 
-### 3.4 Cross-Service Inter-Service Synchronizations
-1. **Direct Campus Transaction Dual Confirmation -> Listing `SOLD` Status Sync**:
+### 3.4 Cross-Service Inter-Service Synchronizations & Security Hardening
+1. **Direct Campus Transaction Dual Confirmation -> Listing `SOLD` Status Sync (F-03 Remediation)**:
    - Step E5 (Buyer Confirmed Handover): Status remains `CONFIRMED` awaiting seller confirmation.
    - Step E6 (Seller Confirmed Handover): Counterparty status confirmed; transaction immediately transitions to `COMPLETED`.
-   - Inter-Service RestClient Call: `transaction-service` automatically invokes `listingClient.markListingAsSold(...)` forwarding the seller's authenticated Bearer token to `listing-service` (Port 8082).
+   - Dedicated Secured Internal Synchronization: `transaction-service` automatically invokes `PATCH /api/v1/listings/{id}/sold-sync` with `X-Internal-Service-Key` header. Listing status reliably transitions to `SOLD` regardless of whether the buyer or seller confirms second.
    - Step E7 Verification: `GET /api/v1/listings/{id}` confirms status transitioned to `SOLD` and `soldAt` is populated with timestamp.
 
-2. **Platform Listing Fee Payment -> Priority Boost Activation**:
+2. **Platform Listing Fee Payment -> Priority Boost Security (F-02 Remediation)**:
+   - Public unauthenticated access to `PATCH /api/v1/listings/{id}/boost` is blocked (removed `.permitAll()`); API Gateway strips external internal headers.
    - Step G3: Seller pays for boost package via VNPAY sandbox.
-   - Inter-Service RestClient Call: `billing-service` invokes `listingBoostClient.activateBoost(listingId, durationDays, null)` on `listing-service` (Port 8082).
-   - Step G5 Verification: `GET /api/v1/listings/{id}` confirms listing status history records `Listing priority boosted for 3 days`.
+   - Inter-Service RestClient Call: `billing-service` invokes `listingBoostClient.activateBoost(...)` passing the trusted internal service header `X-Internal-Service-Key` to `listing-service` (Port 8082).
+   - Step G5 Verification: `GET /api/v1/listings/{id}` confirms listing status history records priority boost.
+
+3. **Campus Meetup Location Invariant Enforcement (F-04 Remediation)**:
+   - Meetup scheduling strictly validates that `meetingLocation` belongs to one of the 6 approved STU campus locations (`CampusLocation.isValidLocation()`). Any off-campus location attempt is rejected with HTTP 400 Bad Request.
 
 ---
 ## 4. Step-by-Step Reproduction Guide

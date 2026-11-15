@@ -15,6 +15,9 @@ public class ListingBoostRestClient implements ListingBoostClient {
 
     private final RestClient restClient;
 
+    @Value("${stu.security.internal-service-key:stu-marketplace-internal-secret-key-2026}")
+    private String internalServiceKey;
+
     public ListingBoostRestClient(@Value("${listing.service.url:http://localhost:8082}") String listingServiceUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(listingServiceUrl)
@@ -29,7 +32,8 @@ public class ListingBoostRestClient implements ListingBoostClient {
 
             var requestSpec = restClient.patch()
                     .uri("/api/v1/listings/{id}/boost", listingId)
-                    .contentType(MediaType.APPLICATION_JSON);
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Service-Key", internalServiceKey);
 
             if (authHeader != null) {
                 requestSpec.header(HttpHeaders.AUTHORIZATION, authHeader);

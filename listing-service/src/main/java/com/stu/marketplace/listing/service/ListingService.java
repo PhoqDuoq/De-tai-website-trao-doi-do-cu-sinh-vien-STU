@@ -406,6 +406,29 @@ public class ListingService {
         return mapToResponse(listing);
     }
 
+    @Transactional
+    public ListingResponse syncListingSold(Long listingId, String reason) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
+
+        String previousStatus = listing.getStatus().name();
+        listing.setStatus(ListingStatus.SOLD);
+        listing.setSoldAt(LocalDateTime.now());
+        listing.setUpdatedAt(LocalDateTime.now());
+        listing = listingRepository.save(listing);
+
+        historyRepository.save(ListingStatusHistory.builder()
+                .listing(listing)
+                .fromStatus(previousStatus)
+                .toStatus(ListingStatus.SOLD.name())
+                .actorId(listing.getSellerId())
+                .reason(StringUtils.hasText(reason) ? reason : "Sold via transaction handover")
+                .build());
+
+        log.info("Listing {} status synchronized to SOLD via internal sync (previous: {})", listingId, previousStatus);
+        return mapToResponse(listing);
+    }
+
     public ListingResponse mapToResponse(Listing listing) {
         List<ListingImageDto> images = listing.getImages().stream()
                 .map(img -> ListingImageDto.builder()

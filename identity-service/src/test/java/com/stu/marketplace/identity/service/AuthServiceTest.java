@@ -22,6 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -178,6 +180,36 @@ class AuthServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> authService.login(request));
         assertEquals(ErrorCode.INVALID_CREDENTIALS, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Should throw ACCOUNT_LOCKED AppException when authentication fails due to locked account")
+    void testLogin_LockedAccount() {
+        LoginRequest request = LoginRequest.builder()
+                .emailOrStudentCode("locked@stu.edu.vn")
+                .password("Password123!")
+                .build();
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new LockedException("User account is locked"));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.login(request));
+        assertEquals(ErrorCode.ACCOUNT_LOCKED, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Should throw ACCOUNT_DISABLED AppException when authentication fails due to disabled account")
+    void testLogin_DisabledAccount() {
+        LoginRequest request = LoginRequest.builder()
+                .emailOrStudentCode("disabled@stu.edu.vn")
+                .password("Password123!")
+                .build();
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new DisabledException("User account is disabled"));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.login(request));
+        assertEquals(ErrorCode.ACCOUNT_DISABLED, ex.getErrorCode());
     }
 
     @Test

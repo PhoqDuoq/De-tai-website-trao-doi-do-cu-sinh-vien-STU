@@ -25,4 +25,27 @@ public enum CampusLocation {
     public static List<CampusLocation> getAll() {
         return Arrays.asList(values());
     }
+
+    public static boolean isValidLocation(String location) {
+        if (location == null || location.isBlank()) {
+            return false;
+        }
+        String trimmed = location.trim();
+        String normalized = trimmed.toLowerCase();
+        for (CampusLocation loc : values()) {
+            if (loc.name().equalsIgnoreCase(trimmed)
+                    || loc.getName().equalsIgnoreCase(trimmed)
+                    || normalized.contains(loc.name().toLowerCase())
+                    || normalized.contains(loc.getName().toLowerCase())
+                    || (loc == HALL_A && (normalized.contains("sanh toa nha a") || normalized.contains("sảnh tòa nhà a") || normalized.contains("sảnh nhà a") || normalized.contains("toa nha a") || normalized.contains("nhà a")))
+                    || (loc == HALL_C && (normalized.contains("sanh toa nha c") || normalized.contains("sảnh tòa nhà c") || normalized.contains("sảnh nhà c") || normalized.contains("toa nha c") || normalized.contains("nhà c")))
+                    || (loc == LIBRARY && (normalized.contains("thu vien") || normalized.contains("thư viện") || normalized.contains("library")))
+                    || (loc == CANTEEN && (normalized.contains("can tin") || normalized.contains("căn tin") || normalized.contains("canteen")))
+                    || (loc == CAMPUS_YARD && (normalized.contains("san truong") || normalized.contains("sân trường") || normalized.contains("campus yard")))
+                    || (loc == PARKING_LOT && (normalized.contains("nha xe") || normalized.contains("nhà xe") || normalized.contains("parking")))) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

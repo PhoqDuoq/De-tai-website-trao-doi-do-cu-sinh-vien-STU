@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -52,6 +54,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS));
+    }
+
+    @ExceptionHandler({LockedException.class, DisabledException.class})
+    public ResponseEntity<ApiResponse<Void>> handleAccountLockedOrDisabled(Exception ex) {
+        log.warn("Account access denied due to lock or disabled status: {}", ex.getMessage());
+        ErrorCode errorCode = (ex instanceof DisabledException) ? ErrorCode.ACCOUNT_DISABLED : ErrorCode.ACCOUNT_LOCKED;
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(errorCode, ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

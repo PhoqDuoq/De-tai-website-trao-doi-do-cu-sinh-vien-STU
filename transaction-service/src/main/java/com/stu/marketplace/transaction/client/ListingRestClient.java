@@ -15,6 +15,9 @@ public class ListingRestClient implements ListingClient {
 
     private final RestClient restClient;
 
+    @Value("${stu.security.internal-service-key:stu-marketplace-internal-secret-key-2026}")
+    private String internalServiceKey;
+
     public ListingRestClient(@Value("${listing.service.url:http://localhost:8082}") String listingServiceUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(listingServiceUrl)
@@ -28,14 +31,15 @@ public class ListingRestClient implements ListingClient {
             String authHeader = (authToken != null && !authToken.startsWith("Bearer ")) ? "Bearer " + authToken : authToken;
 
             var requestSpec = restClient.patch()
-                    .uri("/api/v1/listings/{id}/status", listingId)
-                    .contentType(MediaType.APPLICATION_JSON);
+                    .uri("/api/v1/listings/{id}/sold-sync", listingId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Service-Key", internalServiceKey);
 
             if (authHeader != null) {
                 requestSpec.header(HttpHeaders.AUTHORIZATION, authHeader);
             }
 
-            requestSpec.body(Map.of("status", "SOLD", "reason", reason != null ? reason : "Transaction completed"))
+            requestSpec.body(Map.of("reason", reason != null ? reason : "Transaction completed"))
                     .retrieve()
                     .toBodilessEntity();
 

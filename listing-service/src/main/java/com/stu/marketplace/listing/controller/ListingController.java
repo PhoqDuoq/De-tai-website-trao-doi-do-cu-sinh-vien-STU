@@ -107,6 +107,7 @@ public class ListingController {
     }
 
     @PatchMapping("/{id}/boost")
+    @PreAuthorize("hasAnyRole('INTERNAL_SERVICE', 'ADMIN')")
     public ResponseEntity<ApiResponse<ListingResponse>> boostListing(
             @PathVariable Long id,
             @RequestBody(required = false) java.util.Map<String, Object> request) {
@@ -119,5 +120,17 @@ public class ListingController {
         }
         ListingResponse response = listingService.boostListing(id, durationDays);
         return ResponseEntity.ok(ApiResponse.success("Listing boosted successfully", response));
+    }
+
+    @PatchMapping("/{id}/sold-sync")
+    @PreAuthorize("hasAnyRole('INTERNAL_SERVICE', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ListingResponse>> syncSoldStatus(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, Object> request) {
+        String reason = (request != null && request.containsKey("reason"))
+                ? String.valueOf(request.get("reason"))
+                : "Sold via transaction handover";
+        ListingResponse response = listingService.syncListingSold(id, reason);
+        return ResponseEntity.ok(ApiResponse.success("Listing marked as SOLD via transaction sync", response));
     }
 }

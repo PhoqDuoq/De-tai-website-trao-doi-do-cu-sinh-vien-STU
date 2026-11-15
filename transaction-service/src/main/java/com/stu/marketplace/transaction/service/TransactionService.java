@@ -126,6 +126,11 @@ public class TransactionService {
             throw new AppException(ErrorCode.INVALID_MEETING_TIME);
         }
 
+        if (!CampusLocation.isValidLocation(request.getMeetingLocation())) {
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Meeting location must be an approved STU campus location (e.g. HALL_A, HALL_C, LIBRARY, CANTEEN, CAMPUS_YARD, PARKING_LOT)");
+        }
+
         tx.setMeetingLocation(request.getMeetingLocation().trim());
         tx.setMeetingTime(request.getMeetingTime());
         tx.setStatus(TransactionStatus.CONFIRMED);

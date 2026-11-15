@@ -23,6 +23,8 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
             maxAge: 3600
+      default-filters:
+        - RemoveRequestHeader=X-Internal-Service-Key
       routes:
         # 1. Identity Service Route
         - id: identity-service-route

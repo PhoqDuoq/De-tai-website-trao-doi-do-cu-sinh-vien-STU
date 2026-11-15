@@ -594,8 +594,8 @@ def run_e2e_suite():
         "password": "Password123!"
     })
     record_test("Security", "S8", "SEC-04: Suspended Account Blocked from Login", "POST",
-                "/api/v1/auth/login", 500, res,
-                lambda b: "locked" in str(b.get("message", "")).lower() or "suspended" in str(b.get("message", "")).lower())
+                "/api/v1/auth/login", 403, res,
+                lambda b: b.get("success") is False and b.get("code") in (1014, 1008))
 
     # -------------------------------------------------------------------------
     # Verification Summary & Report

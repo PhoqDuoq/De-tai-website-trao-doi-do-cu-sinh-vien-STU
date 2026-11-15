@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -129,6 +131,12 @@ public class AuthService {
                     .build();
         } catch (BadCredentialsException e) {
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        } catch (LockedException e) {
+            log.warn("Login rejected: account is locked or suspended for user: {}", request.getEmailOrStudentCode());
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED, "User account is locked or suspended");
+        } catch (DisabledException e) {
+            log.warn("Login rejected: account is disabled for user: {}", request.getEmailOrStudentCode());
+            throw new AppException(ErrorCode.ACCOUNT_DISABLED, "User account is disabled");
         }
     }
 
