@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `reviews` (
     `reviewer_id` BIGINT UNSIGNED NOT NULL COMMENT 'Logical reference to Identity Service',
     `reviewee_id` BIGINT UNSIGNED NOT NULL COMMENT 'Logical reference to Identity Service',
     `transaction_id` BIGINT UNSIGNED NOT NULL COMMENT 'Logical reference to Transaction Service',
-    `rating` TINYINT UNSIGNED NOT NULL COMMENT 'Rating scale 1 to 5 stars',
+    `rating` INT NOT NULL COMMENT 'Rating scale 1 to 5 stars',
     `comment` TEXT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uk_reviewer_transaction` (`reviewer_id`, `transaction_id`),

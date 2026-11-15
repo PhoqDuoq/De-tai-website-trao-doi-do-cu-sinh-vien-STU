@@ -184,8 +184,8 @@ public class TransactionService {
             timelineRepository.save(confirmAudit);
 
             Long counterpartyId = tx.getBuyerId().equals(userId) ? tx.getSellerId() : tx.getBuyerId();
-            boolean counterpartyConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndStatus(
-                    tx.getId(), counterpartyId, TransactionStatus.CONFIRMED);
+            boolean counterpartyConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndNoteStartingWith(
+                    tx.getId(), counterpartyId, "CONFIRMED_BY_");
 
             if (counterpartyConfirmed) {
                 completeNow = true;
@@ -353,10 +353,10 @@ public class TransactionService {
     }
 
     private TransactionResponse mapToResponse(Transaction tx, Long currentUserId) {
-        boolean buyerConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndStatus(
-                tx.getId(), tx.getBuyerId(), TransactionStatus.CONFIRMED);
-        boolean sellerConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndStatus(
-                tx.getId(), tx.getSellerId(), TransactionStatus.CONFIRMED);
+        boolean buyerConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndNoteStartingWith(
+                tx.getId(), tx.getBuyerId(), "CONFIRMED_BY_");
+        boolean sellerConfirmed = timelineRepository.existsByTransactionIdAndActorIdAndNoteStartingWith(
+                tx.getId(), tx.getSellerId(), "CONFIRMED_BY_");
 
         List<TimelineResponse> timelines = timelineRepository.findByTransactionIdOrderByCreatedAtAsc(tx.getId())
                 .stream()

@@ -105,4 +105,19 @@ public class ListingController {
         ListingResponse response = listingService.moderateListing(id, userPrincipal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Listing moderated successfully", response));
     }
+
+    @PatchMapping("/{id}/boost")
+    public ResponseEntity<ApiResponse<ListingResponse>> boostListing(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, Object> request) {
+        int durationDays = 3;
+        if (request != null && request.containsKey("durationDays")) {
+            Object val = request.get("durationDays");
+            if (val instanceof Number) {
+                durationDays = ((Number) val).intValue();
+            }
+        }
+        ListingResponse response = listingService.boostListing(id, durationDays);
+        return ResponseEntity.ok(ApiResponse.success("Listing boosted successfully", response));
+    }
 }

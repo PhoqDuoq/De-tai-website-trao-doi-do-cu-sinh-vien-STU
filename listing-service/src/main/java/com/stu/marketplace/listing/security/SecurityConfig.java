@@ -32,6 +32,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/listings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/listings/{id:[0-9]+}").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/listings/{id:[0-9]+}/boost").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/listings/pending").hasAnyRole("ADMIN", "MODERATOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/categories/**").hasAnyRole("ADMIN", "MODERATOR")
                         .requestMatchers("/api/v1/listings/{id}/moderate").hasAnyRole("ADMIN", "MODERATOR")

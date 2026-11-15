@@ -13,7 +13,8 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 | **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
 | **Phase 2** | **Core Domain Microservices & JPA Persistence** | **NGHIỆM THU ĐỢT 1 THÀNH CÔNG (SEC-01 to SEC-05 Remediated)** | 100% Đợt 1 (36/36 Tests Pass) | [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md)<br>[`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 3** | **Business Interactions, Campus Meetups, Moderation & Billing** | **HOÀN THÀNH TOÀN DIỆN (ĐỢT 1 & ĐỢT 2 HOÀN TẤT - 133/133 TESTS PASS)** | 100% Phase 3 (Đợt 1: 77 tests + Đợt 2: 56 tests) | [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
-| **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
+| **Milestone 5** | **Backend Runtime End-to-End Verification** | **NGHIỆM THU HOÀN TOÀN (48/48 E2E JOURNEYS PASS - 7/7 SERVICES UP)** | 100% (7 Services + Gateway, Zero P2P, SOLD Sync, Boost) | [`docs/BACKEND_RUNTIME_VERIFICATION.md`](BACKEND_RUNTIME_VERIFICATION.md) |
+| **Phase 4** | Full Integration, Frontend SPA & Verification | Sẵn sàng triển khai | 0% | TBD |
 
 ---
 

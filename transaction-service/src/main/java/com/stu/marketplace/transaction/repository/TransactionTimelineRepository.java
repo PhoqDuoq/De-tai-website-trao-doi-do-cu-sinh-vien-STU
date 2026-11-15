@@ -13,4 +13,6 @@ public interface TransactionTimelineRepository extends JpaRepository<Transaction
     List<TransactionTimeline> findByTransactionIdOrderByCreatedAtAsc(Long transactionId);
 
     boolean existsByTransactionIdAndActorIdAndStatus(Long transactionId, Long actorId, TransactionStatus status);
+
+    boolean existsByTransactionIdAndActorIdAndNoteStartingWith(Long transactionId, Long actorId, String prefix);
 }

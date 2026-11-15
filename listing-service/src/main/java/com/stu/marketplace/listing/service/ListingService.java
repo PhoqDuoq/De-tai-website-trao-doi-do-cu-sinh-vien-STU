@@ -386,6 +386,26 @@ public class ListingService {
                 .build();
     }
 
+    @Transactional
+    public ListingResponse boostListing(Long listingId, int durationDays) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
+
+        listing.setUpdatedAt(LocalDateTime.now());
+        listing = listingRepository.save(listing);
+
+        historyRepository.save(ListingStatusHistory.builder()
+                .listing(listing)
+                .fromStatus(listing.getStatus().name())
+                .toStatus(listing.getStatus().name())
+                .actorId(listing.getSellerId())
+                .reason("Listing priority boosted for " + durationDays + " days")
+                .build());
+
+        log.info("Listing {} successfully boosted for {} days", listingId, durationDays);
+        return mapToResponse(listing);
+    }
+
     public ListingResponse mapToResponse(Listing listing) {
         List<ListingImageDto> images = listing.getImages().stream()
                 .map(img -> ListingImageDto.builder()

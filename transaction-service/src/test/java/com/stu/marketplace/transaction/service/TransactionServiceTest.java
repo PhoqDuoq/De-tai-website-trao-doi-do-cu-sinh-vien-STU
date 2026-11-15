@@ -221,7 +221,7 @@ class TransactionServiceTest {
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
 
         // Counterparty (buyer 10) has already confirmed
-        when(timelineRepository.existsByTransactionIdAndActorIdAndStatus(1L, 10L, TransactionStatus.CONFIRMED))
+        when(timelineRepository.existsByTransactionIdAndActorIdAndNoteStartingWith(1L, 10L, "CONFIRMED_BY_"))
                 .thenReturn(true);
 
         TransactionConfirmRequest request = new TransactionConfirmRequest(null, "Seller confirming handover");

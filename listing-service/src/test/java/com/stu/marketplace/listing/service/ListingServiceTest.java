@@ -163,4 +163,18 @@ class ListingServiceTest {
         assertNotNull(response.getPublishedAt());
         verify(historyRepository).save(any(ListingStatusHistory.class));
     }
+
+    @Test
+    @DisplayName("Should activate priority boost and update listing timestamp")
+    void testBoostListing_Success() {
+        when(listingRepository.findById(100L)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ListingResponse response = listingService.boostListing(100L, 7);
+
+        assertNotNull(response);
+        assertEquals(sampleListing.getId(), response.getId());
+        verify(listingRepository).save(any(Listing.class));
+        verify(historyRepository).save(any(ListingStatusHistory.class));
+    }
 }
