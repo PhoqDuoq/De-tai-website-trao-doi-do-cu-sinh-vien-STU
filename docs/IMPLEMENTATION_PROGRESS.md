@@ -12,7 +12,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 |---|---|---|---|---|
 | **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
 | **Phase 2** | **Core Domain Microservices & JPA Persistence** | **NGHIỆM THU ĐỢT 1 THÀNH CÔNG (SEC-01 to SEC-05 Remediated)** | 100% Đợt 1 (36/36 Tests Pass) | [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md)<br>[`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
-| **Phase 3** | **Business Interactions, Campus Meetups & Transactions** | **HOÀN THÀNH ĐỢT 1 (INTERACTION & TRANSACTION SERVICES)** | 100% Đợt 1 (77/77 Tests Pass) | [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
+| **Phase 3** | **Business Interactions, Campus Meetups, Moderation & Billing** | **HOÀN THÀNH TOÀN DIỆN (ĐỢT 1 & ĐỢT 2 HOÀN TẤT - 133/133 TESTS PASS)** | 100% Phase 3 (Đợt 1: 77 tests + Đợt 2: 56 tests) | [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
 
 ---
@@ -194,3 +194,65 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
   - 0 SQL JOIN xuyên database.
   - Tất cả liên kết chéo (`user_id`, `listing_id`, `transaction_id`) là scalar ID `BIGINT`.
   - Không xử lý thanh toán tiền giữa sinh viên (giao dịch tiền mặt/trao đổi trực tiếp tại trường).
+
+---
+
+## Chi Tiết Hạng Mục Giai Đoạn 3 — Đợt 2 (Phase 3 Batch 2: Moderation & Billing Services)
+
+### 1. Moderation Service (Port 8085 — `stu_moderation_db`)
+- [x] **JPA Entities & Schema Matching (`stu_moderation_db.sql`)**:
+  - `Report`: Báo cáo vi phạm đối với tin đăng, người dùng, bình luận hoặc tin nhắn (`target_type`, `target_id`, `reason`, `status`, `assigned_moderator_id`, `resolution_action`, `resolution_notes`, `resolved_at`).
+  - `ForbiddenKeyword`: Từ điển từ khóa cấm tự động (`keyword` unique, `category`, `severity` AUTO_REJECT/FLAG_FOR_REVIEW, `is_active`).
+  - `ModerationAuditLog`: Nhật ký kiểm toán bất biến các hành động của kiểm duyệt viên (`moderator_id`, `action_type`, `target_type`, `target_id`, `reason`).
+  - `Penalty`: Quản lý các án phạt áp dụng lên tài khoản người dùng vi phạm (`user_id`, `report_id`, `penalty_type` WARNING/TEMPORARY_BAN/PERMANENT_BAN, `duration_days`, `issued_by`, `expires_at`).
+  - Enums đầy đủ: `ReportTargetType`, `ReportReason`, `ReportStatus`, `ResolutionAction`, `KeywordSeverity`, `PenaltyType`.
+- [x] **Spring Data JPA Repositories**:
+  - `ReportRepository`, `ForbiddenKeywordRepository`, `ModerationAuditLogRepository`, `PenaltyRepository`.
+- [x] **Spring Security 6 & JWT (SEC-04 Compliant)**:
+  - `UserPrincipal`, `JwtTokenValidator`, `JwtAuthFilter`, `JwtAuthenticationEntryPoint`, `SecurityConfig`, `GlobalExceptionHandler`.
+  - Chặn vô điều kiện các token thuộc tài khoản bị khóa (`LOCKED`) hoặc đình chỉ (`SUSPENDED`).
+- [x] **Nghiệp Vụ Kiểm Duyệt (Business Services)**:
+  - `ForbiddenKeywordService`: Quét phát hiện từ khóa cấm theo substring/regex không phân biệt hoa thường, phân loại mức độ nghiêm trọng (`AUTO_REJECT` vs `FLAG_FOR_REVIEW`), CRUD từ điển và ghi audit log.
+  - `ReportService`: Tiếp nhận báo cáo vi phạm, chặn tự báo cáo chính mình (`CANNOT_REPORT_SELF`), chặn báo cáo trùng lặp khi đang chờ xử lý (`REPORT_ALREADY_EXISTS`), phân trang hàng đợi duyệt theo trạng thái/mục tiêu, phân công moderator (`PENDING -> INVESTIGATING`), phán quyết xử lý (`INVESTIGATING -> RESOLVED`) tự động phát hành án phạt tương ứng, bác bỏ báo cáo (`DISMISSED`).
+  - `PenaltyService`: Phát hành cảnh cáo, đình chỉ tạm thời có tính hạn ngày hết hạn (`expiresAt`), khóa tài khoản vĩnh viễn, truy vấn lịch sử án phạt theo người dùng.
+  - `ModerationAuditLogService`: Ghi nhận và truy vấn lịch sử hành động của kiểm duyệt viên theo moderator hoặc theo target.
+- [x] **REST Controllers**:
+  - `ReportController` (`/api/v1/reports/**` và `/api/v1/moderation/reports/**`)
+  - `ForbiddenKeywordController` (`/api/v1/moderation/keywords/**`)
+  - `PenaltyController` (`/api/v1/moderation/penalties/**`)
+  - `ModerationAuditController` (`/api/v1/moderation/audit-logs/**`)
+- [x] **Kiểm Thử Độc Lập**:
+  - 31 tests đạt 100% PASS (0 failures, 0 errors): `ForbiddenKeywordServiceTest` (8), `ReportServiceTest` (8), `PenaltyServiceTest` (4), `ModerationSecuritySuiteTest` (5), `ModerationControllerIntegrationTest` (6).
+
+### 2. Billing Service (Port 8086 — `stu_billing_db`)
+- [x] **JPA Entities & Schema Matching (`stu_billing_db.sql`)**:
+  - `FeePackage`: Danh mục gói phí đẩy tin ưu tiên (`package_code` unique, `name`, `description`, `price`, `duration_days`, `is_active`).
+  - `Invoice`: Hóa đơn thu phí nền tảng xuất cho người bán (`invoice_code` unique `INV-YYYYMMDD-XXXXXX`, `user_id`, `listing_id`, `package_id`, `amount`, `status`).
+  - `PaymentTransaction`: Giao dịch thanh toán cổng trung gian (`invoice_id`, `gateway_provider` VNPAY/MOMO/BANK_TRANSFER, `gateway_txn_ref` unique, `amount`, `status`, `callback_payload`).
+  - Enums: `InvoiceStatus`, `PaymentGatewayProvider`, `PaymentStatus`.
+- [x] **Spring Data JPA Repositories**:
+  - `FeePackageRepository`, `InvoiceRepository`, `PaymentTransactionRepository`.
+- [x] **Spring Security 6 & JWT (SEC-04 Compliant)**:
+  - `UserPrincipal`, `JwtTokenValidator`, `JwtAuthFilter`, `JwtAuthenticationEntryPoint`, `SecurityConfig`, `GlobalExceptionHandler`.
+- [x] **Strict R3 Invariant Guardrail (Cấm Tuyệt Đối Thanh Toán P2P Giữa Sinh Viên)**:
+  - Nghiêm cấm hoàn toàn ví điện tử trung gian, escrow giữ tiền hoặc thanh toán mua bán P2P giữa sinh viên.
+  - Điểm kiểm soát `PaymentService.rejectStudentToStudentPayment()` chặn tức thì mọi truy cập với HTTP 400 Bad Request và `ErrorCode.STUDENT_PAYMENT_PROHIBITED (6004)`.
+- [x] **Kích Hoạt Ưu Tiên Liên Dịch Vụ Resilient (ListingBoostClient)**:
+  - Triển khai `ListingBoostClient` và `ListingBoostRestClient` sử dụng Spring 6 `RestClient`.
+  - Tự động thông báo tới `listing-service` khi hóa đơn chuyển sang `PAID` để kích hoạt ưu tiên bài đăng.
+  - Bọc try-catch và logging cảnh báo, không làm hủy giao dịch thanh toán nếu dịch vụ tin đăng tạm thời gián đoạn.
+- [x] **Nghiệp Vụ Hóa Đơn & Thanh Toán (Business Services)**:
+  - `FeePackageService`: Quản lý danh mục gói phí kích hoạt, tạo/cập nhật gói phí cho Admin.
+  - `InvoiceService`: Tạo hóa đơn mua gói phí, sinh mã hóa đơn duy nhất, kiểm tra gói phí hợp lệ/kích hoạt, kiểm tra quyền sở hữu người bán, hủy hóa đơn chờ.
+  - `PaymentService`: Xử lý thanh toán sandbox (`PENDING -> PAID`), ghi nhận giao dịch thành công, xử lý IPN callback idempotent, chặn thanh toán hóa đơn đã thanh toán hoặc đã hủy.
+- [x] **REST Controllers**:
+  - `FeePackageController` (`/api/v1/billing/packages/**`)
+  - `InvoiceController` (`/api/v1/billing/invoices/**` và `/api/v1/invoices/**`)
+  - `PaymentController` (`/api/v1/billing/payments/**`, `/api/v1/billing/transfers`)
+- [x] **Kiểm Thử Độc Lập**:
+  - 25 tests đạt 100% PASS (0 failures, 0 errors): `FeePackageServiceTest` (5), `InvoiceServiceTest` (6), `PaymentServiceTest` (4), `ZeroP2PPaymentTest` (1), `BillingSecuritySuiteTest` (5), `BillingControllerIntegrationTest` (4).
+
+### 3. Tổng Hợp Đợt 2 & Quy Tắc Cách Ly Cơ Sở Dữ Liệu
+- Toàn bộ 56 tests mới của Đợt 2 (31 Moderation + 25 Billing) đều PASS 100%.
+- Không vi phạm nguyên tắc cách ly dữ liệu: 0 cross-database foreign keys, 0 cross-database joins.
+- Định tuyến API Gateway (`api-gateway/src/main/resources/application.yml` Route 5 và Route 6) ăn khớp 100% với các controller endpoints.

@@ -280,7 +280,71 @@ Trường hợp Bean Validation thất bại (HTTP 400):
 
 ---
 
-## 6. Danh Mục Mã Lỗi Nghiệp Vụ (`ErrorCode`)
+## 6. Moderation Service Endpoints (`/api/v1/moderation/**`, `/api/v1/reports/**`)
+
+### 6.1 Báo Cáo Vi Phạm (Reports)
+- `POST /api/v1/reports`: Người dùng gửi báo cáo vi phạm đối với tin đăng, tài khoản, bình luận, tin nhắn (`PENDING`).
+  - Invariant 1: Chặn người dùng tự báo cáo chính mình (`targetType == USER && targetId == currentUserId`, ném mã `CANNOT_REPORT_SELF (5003)`).
+  - Invariant 2: Chặn spam báo cáo trùng lặp cho cùng một đối tượng khi đã có báo cáo `PENDING` hoặc `INVESTIGATING` (ném `REPORT_ALREADY_EXISTS (5007)`).
+- `GET /api/v1/reports/my-reports`: Người dùng tra cứu lịch sử và trạng thái xử lý các báo cáo do chính mình gửi (Authenticated).
+- `GET /api/v1/moderation/reports`: Danh sách hàng đợi báo cáo vi phạm cần duyệt (Phân trang, lọc theo `status`, `targetType`). Quyền hạn: Moderator, Admin.
+- `GET /api/v1/moderation/reports/{id}`: Xem chi tiết báo cáo và bằng chứng vi phạm. Quyền hạn: Moderator, Admin.
+- `PATCH /api/v1/moderation/reports/{id}/assign`: Moderator nhận xử lý báo cáo (`PENDING -> INVESTIGATING`). Ghi nhận `assigned_moderator_id` và nhật ký audit log.
+- `PATCH /api/v1/moderation/reports/{id}/resolve`: Moderator đưa ra phán quyết xử lý vi phạm (`INVESTIGATING -> RESOLVED`).
+  - Áp dụng các hành động: `WARNING_SENT`, `CONTENT_REMOVED`, `USER_TEMPORARILY_BANNED`, `USER_PERMANENTLY_BANNED`, `NO_ACTION`.
+  - Tự động phát hành bản ghi `Penalty` tương ứng nếu đối tượng là `USER`.
+  - Bắt buộc điền ghi chú giải quyết (`resolutionNotes`).
+- `PATCH /api/v1/moderation/reports/{id}/dismiss`: Moderator bác bỏ báo cáo không có cơ sở (`DISMISSED`). Bắt buộc điền lý do và ghi audit log.
+
+### 6.2 Bộ Lọc Từ Khóa Cấm Tự Động (Forbidden Keywords)
+- `POST /api/v1/moderation/keywords/check`: Kiểm tra nội dung văn bản (tiêu đề, mô tả) có chứa từ khóa cấm/nhạy cảm không. Trả về `clean: bool`, `flaggedKeywords`, `severity` (`AUTO_REJECT` / `FLAG_FOR_REVIEW`) và `suggestedAction` (`PASS`, `FLAG_FOR_REVIEW`, `AUTO_REJECT`).
+- `GET /api/v1/moderation/keywords`: Tra cứu danh mục từ khóa cấm (Phân trang, lọc theo danh mục và trạng thái kích hoạt). Quyền hạn: Moderator, Admin.
+- `POST /api/v1/moderation/keywords`: Thêm từ khóa cấm mới vào từ điển. Quyền hạn: Moderator, Admin.
+- `PUT /api/v1/moderation/keywords/{id}`: Cập nhật từ khóa, danh mục, mức độ nghiêm trọng hoặc bật/tắt kích hoạt. Quyền hạn: Moderator, Admin.
+- `DELETE /api/v1/moderation/keywords/{id}`: Xóa từ khóa cấm khỏi từ điển. Quyền hạn: Moderator, Admin.
+
+### 6.3 Xử Phạt & Nhật Ký Kiểm Duyệt (Penalties & Audit Logs)
+- `POST /api/v1/moderation/penalties`: Phát hành hình thức xử phạt trực tiếp đối với người dùng vi phạm (`WARNING`, `TEMPORARY_BAN` có thời hạn ngày, `PERMANENT_BAN`). Quyền hạn: Moderator, Admin.
+- `GET /api/v1/moderation/penalties/user/{userId}`: Tra cứu lịch sử vi phạm và các án phạt của người dùng. Quyền hạn: Moderator, Admin.
+- `GET /api/v1/moderation/penalties`: Danh sách tổng hợp tất cả các quyết định xử phạt trong hệ thống.
+- `GET /api/v1/moderation/audit-logs`: Tra cứu nhật ký hành động bất biến của đội ngũ kiểm duyệt viên (lọc theo `moderatorId`, phân trang).
+- `GET /api/v1/moderation/audit-logs/target`: Tra cứu lịch sử kiểm duyệt theo loại và mã đối tượng cụ thể (`targetType`, `targetId`).
+
+---
+
+## 7. Billing Service Endpoints (`/api/v1/billing/**`, `/api/v1/invoices/**`)
+
+### 7.1 Gói Phí Đăng Tin & Đẩy Bài (Fee Packages)
+- `GET /api/v1/billing/packages`: Lấy danh mục các gói đẩy tin / huy hiệu ưu tiên đang hoạt động (Public / Authenticated).
+- `GET /api/v1/billing/packages/{id}`: Xem chi tiết thông tin gói phí.
+- `POST /api/v1/billing/packages`: Admin tạo gói phí mới (Mã gói, tên, mô tả, giá tiền, số ngày hiệu lực).
+- `PUT /api/v1/billing/packages/{id}`: Admin cập nhật thông tin gói phí hoặc kích hoạt/vô hiệu hóa gói.
+
+### 7.2 Hóa Đơn Dịch Vụ Nền Tảng (Invoices)
+- `POST /api/v1/billing/invoices` hoặc `POST /api/v1/invoices`: Người bán tạo hóa đơn mua gói đẩy tin cho bài đăng của mình (`PENDING`).
+  - Sinh mã hóa đơn chuẩn định dạng `INV-YYYYMMDD-XXXXXX`.
+  - Invariant: Kiểm tra gói phí tồn tại và đang kích hoạt (`is_active = true`).
+- `GET /api/v1/billing/invoices/my-invoices`: Người bán xem danh sách hóa đơn dịch vụ của chính mình.
+- `GET /api/v1/billing/invoices/{id}`: Xem chi tiết hóa đơn (Kiểm tra quyền sở hữu: chỉ chủ hóa đơn hoặc Staff mới được xem).
+- `GET /api/v1/billing/invoices`: Admin tra cứu danh sách toàn bộ hóa đơn trên sàn (lọc theo `status`, phân trang).
+- `POST /api/v1/billing/invoices/{id}/cancel`: Hủy hóa đơn đang chờ thanh toán (`PENDING -> EXPIRED`). Chặn hủy nếu hóa đơn đã `PAID`.
+
+### 7.3 Thanh Toán Phí Dịch Vụ Nền Tảng & Kích Hoạt Đẩy Tin (Payments & Boost Activation)
+- `POST /api/v1/billing/invoices/{id}/pay`: Xử lý thanh toán phí đăng tin qua Sandbox Gateway (`VNPAY`, `MOMO`, `BANK_TRANSFER`).
+  - Sinh mã giao dịch duy nhất dạng `TXN-{GATEWAY}-YYYYMMDD-XXXXXXXX`.
+  - Chuyển trạng thái hóa đơn sang `PAID`, ghi nhận thời điểm thanh toán `paid_at`.
+  - **Kích hoạt gói ưu tiên liên dịch vụ**: Tự động gọi `ListingBoostClient` (Spring 6 RestClient) gửi thông báo tới `listing-service` để gia hạn và kích hoạt ưu tiên hiển thị cho bài đăng (`is_boosted = true`, `durationDays`). Cơ chế try-catch bảo đảm thanh toán luôn an toàn ngay cả khi `listing-service` gặp sự cố tạm thời.
+- `POST /api/v1/billing/payments/callback`: Nhận thông báo IPN từ cổng thanh toán đối tác (Xử lý Idempotent bảo đảm không trừ tiền hoặc kích hoạt trùng lặp).
+- `GET /api/v1/billing/invoices/{id}/transactions`: Tra cứu lịch sử các giao dịch thanh toán liên quan đến hóa đơn.
+
+### 7.4 Rào Chắn Nghiệp Vụ Tuyệt Đối (Strict R3 Invariant Guardrail)
+- `POST /api/v1/billing/payments/transfers`, `POST /api/v1/billing/transfers`, `POST /api/v1/billing/escrow`:
+  - **Quy tắc bất biến**: Tuyệt đối **KHÔNG** hỗ trợ thanh toán mua bán trực tiếp giữa các sinh viên, không mở ví điện tử trung gian, không giữ tiền ký quỹ (escrow) giữa người mua và người bán.
+  - Bất kỳ yêu cầu nào cố gắng gọi các luồng thanh toán P2P đều bị chặn ngay lập tức với mã lỗi HTTP 400 Bad Request: `STUDENT_PAYMENT_PROHIBITED (6004)`.
+
+---
+
+## 8. Danh Mục Mã Lỗi Nghiệp Vụ (`ErrorCode`)
 
 | Mã Lỗi | HTTP Status | Thông Điệp Lỗi | Ý Nghĩa Nghiệp Vụ |
 |---|:---:|---|---|
@@ -316,3 +380,18 @@ Trường hợp Bean Validation thất bại (HTTP 400):
 | `4005` | 400 | Meeting time must be in the future | Thời gian hẹn phải ở tương lai |
 | `4006` | 400 | Transaction verification code is invalid | Mã xác nhận giao dịch không hợp lệ |
 | `4007` | 400 | Transaction has already been completed or cancelled | Giao dịch đã kết thúc, không thể thay đổi |
+| `5001` | 404 | Moderation report not found | Không tìm thấy báo cáo vi phạm |
+| `5002` | 400 | Content contains prohibited or offensive keywords | Nội dung chứa từ ngữ thô tục hoặc hàng cấm |
+| `5003` | 400 | User cannot report themselves | Người dùng không thể tự báo cáo chính mình |
+| `5004` | 400 | Report has already been resolved or dismissed | Báo cáo đã được xử lý hoặc bác bỏ |
+| `5005` | 409 | Forbidden keyword already exists | Từ khóa cấm đã tồn tại trong từ điển |
+| `5006` | 404 | Forbidden keyword not found | Không tìm thấy từ khóa cấm |
+| `5007` | 409 | A pending report for this target already exists | Đã có báo cáo đang chờ xử lý cho mục tiêu này |
+| `6001` | 404 | Listing fee package not found | Không tìm thấy gói phí đăng tin |
+| `6002` | 404 | Invoice record not found | Không tìm thấy hóa đơn dịch vụ |
+| `6003` | 400 | Payment processing failed | Xử lý thanh toán thất bại |
+| `6004` | 400 | Student-to-student payments are not supported on this platform | Nghiêm cấm giao dịch tiền tệ trực tiếp giữa sinh viên (R3 Invariant) |
+| `6005` | 400 | Invoice has already been paid | Hóa đơn đã được thanh toán |
+| `6006` | 400 | Invoice is expired or cancelled | Hóa đơn đã hết hạn hoặc bị hủy |
+| `6007` | 403 | User is not authorized to access or modify this billing resource | Không có quyền truy cập hóa đơn của người khác |
+| `6008` | 400 | Listing fee package is inactive | Gói phí đăng tin hiện đang tạm ngừng hoạt động |

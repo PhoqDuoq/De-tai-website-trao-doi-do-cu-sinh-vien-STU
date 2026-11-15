@@ -57,3 +57,18 @@ CREATE TABLE IF NOT EXISTS `moderation_audit_logs` (
     INDEX `idx_audit_moderator` (`moderator_id`),
     INDEX `idx_audit_target` (`target_type`, `target_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table 4: penalties (Account and listing penalties issued by moderation)
+CREATE TABLE IF NOT EXISTS `penalties` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT UNSIGNED NOT NULL COMMENT 'Logical reference to Identity Service',
+    `report_id` BIGINT UNSIGNED NULL COMMENT 'Optional logical reference to reports.id',
+    `penalty_type` ENUM('WARNING', 'TEMPORARY_BAN', 'PERMANENT_BAN') NOT NULL,
+    `reason` VARCHAR(255) NOT NULL,
+    `duration_days` INT NULL COMMENT 'Duration in days for TEMPORARY_BAN, null otherwise',
+    `issued_by` BIGINT UNSIGNED NOT NULL COMMENT 'Logical reference to Identity Service (moderator)',
+    `expires_at` TIMESTAMP NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_penalties_user` (`user_id`),
+    INDEX `idx_penalties_type` (`penalty_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

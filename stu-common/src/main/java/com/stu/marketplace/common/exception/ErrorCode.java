@@ -71,12 +71,21 @@ public enum ErrorCode {
     // Moderation Service (5000 - 5999)
     REPORT_NOT_FOUND(5001, "Moderation report not found", HttpStatus.NOT_FOUND),
     CONTENT_CONTAINS_FORBIDDEN_WORDS(5002, "Content contains prohibited or offensive keywords", HttpStatus.BAD_REQUEST),
+    CANNOT_REPORT_SELF(5003, "User cannot report themselves", HttpStatus.BAD_REQUEST),
+    REPORT_ALREADY_RESOLVED(5004, "Report has already been resolved or dismissed", HttpStatus.BAD_REQUEST),
+    KEYWORD_ALREADY_EXISTS(5005, "Forbidden keyword already exists", HttpStatus.CONFLICT),
+    KEYWORD_NOT_FOUND(5006, "Forbidden keyword not found", HttpStatus.NOT_FOUND),
+    REPORT_ALREADY_EXISTS(5007, "A pending report for this target already exists", HttpStatus.CONFLICT),
 
     // Billing Service (6000 - 6999)
     FEE_PACKAGE_NOT_FOUND(6001, "Listing fee package not found", HttpStatus.NOT_FOUND),
     INVOICE_NOT_FOUND(6002, "Invoice record not found", HttpStatus.NOT_FOUND),
     PAYMENT_FAILED(6003, "Payment processing failed", HttpStatus.BAD_REQUEST),
-    STUDENT_PAYMENT_PROHIBITED(6004, "Student-to-student payments are not supported on this platform", HttpStatus.BAD_REQUEST);
+    STUDENT_PAYMENT_PROHIBITED(6004, "Student-to-student payments are not supported on this platform", HttpStatus.BAD_REQUEST),
+    INVOICE_ALREADY_PAID(6005, "Invoice has already been paid", HttpStatus.BAD_REQUEST),
+    INVOICE_EXPIRED(6006, "Invoice is expired or cancelled", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED_BILLING_ACTION(6007, "User is not authorized to access or modify this billing resource", HttpStatus.FORBIDDEN),
+    PACKAGE_INACTIVE(6008, "Listing fee package is inactive", HttpStatus.BAD_REQUEST);
 
     private final int code;
     private final String message;
