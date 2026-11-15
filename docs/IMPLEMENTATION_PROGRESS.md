@@ -12,7 +12,7 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 |---|---|---|---|---|
 | **Phase 1** | **Project Foundation & Monorepo Architecture** | **NGHIỆM THU THÀNH CÔNG (READY FOR PHASE 2)** | 10/10 Deliverables | [`docs/PHASE1_RUNTIME_VERIFICATION.md`](PHASE1_RUNTIME_VERIFICATION.md) |
 | **Phase 2** | **Core Domain Microservices & JPA Persistence** | **NGHIỆM THU ĐỢT 1 THÀNH CÔNG (SEC-01 to SEC-05 Remediated)** | 100% Đợt 1 (36/36 Tests Pass) | [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md)<br>[`docs/PHASE2_IMPLEMENTATION_REPORT.md`](PHASE2_IMPLEMENTATION_REPORT.md)<br>[`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
-| **Phase 3** | Business Interactions, Campus Meetups & Moderation | Chưa bắt đầu | 0% | TBD |
+| **Phase 3** | **Business Interactions, Campus Meetups & Transactions** | **HOÀN THÀNH ĐỢT 1 (INTERACTION & TRANSACTION SERVICES)** | 100% Đợt 1 (77/77 Tests Pass) | [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) |
 | **Phase 4** | Full Integration, Frontend SPA & Verification | Chưa bắt đầu | 0% | TBD |
 
 ---
@@ -130,3 +130,67 @@ Kiến trúc nền tảng: **Java 21 LTS | Spring Boot 3.3.5 | Spring Cloud 2023
 - [x] **SEC-05**: Chống tấn công dò quét người dùng (User Enumeration) ở chức năng quên mật khẩu (trả về HTTP 200 thông điệp chung thống nhất).
 - [x] Bộ kiểm thử bảo mật tự động: 36/36 tests đạt 100% PASS (18 tests `identity-service`, 18 tests `listing-service`).
 - [x] Tài liệu nghiệm thu chi tiết: [`docs/PHASE2_BATCH1_ACCEPTANCE.md`](PHASE2_BATCH1_ACCEPTANCE.md).
+
+---
+
+## Chi Tiết Hạng Mục Giai Đoạn 3 — Đợt 1 (Phase 3 Batch 1: Interaction & Transaction Services)
+
+### 1. Interaction Service (Port 8083 — `stu_interaction_db`)
+- [x] **JPA Entities & Schema Matching**:
+  - `Favorite`: Quản lý tin yêu thích, unique constraint `uk_user_listing (user_id, listing_id)`.
+  - `Comment`: Bình luận phân cấp cây (`parent_id` self-reference), cascade deletion.
+  - `Conversation`: Cuộc trò chuyện 1-1, unique constraint `uk_conversation_participants (listing_id, buyer_id, seller_id)`.
+  - `Message`: Tin nhắn trao đổi (`message_type` ENUM `TEXT`, `IMAGE`, `LOCATION`), cờ `is_read`.
+  - `Review`: Đánh giá 1-5 sao sau giao dịch, unique constraint `uk_reviewer_transaction`.
+- [x] **Spring Data JPA Repositories**:
+  - `FavoriteRepository`, `CommentRepository`, `ConversationRepository`, `MessageRepository`, `ReviewRepository`.
+- [x] **Spring Security 6 & JWT (SEC-04 Compliant)**:
+  - `UserPrincipal`, `JwtTokenValidator` (HMAC-SHA512), `JwtAuthFilter`, `JwtAuthenticationEntryPoint`, `SecurityConfig`.
+  - Chặn token của tài khoản bị khóa/đình chỉ (`LOCKED`, `SUSPENDED`).
+  - `GlobalExceptionHandler` bắt lỗi `AppException`, validation errors, `AccessDeniedException`.
+- [x] **Nghiệp Vụ & Quyền Sở Hữu (Ownership Checks)**:
+  - `FavoriteService`: Thêm, xóa, toggle, kiểm tra trạng thái, xem danh sách yêu thích cá nhân, đếm lượt yêu thích.
+  - `CommentService`: Bình luận công khai, kiểm tra parent thuộc cùng listingId (chống cross-listing injection), chỉ tác giả được sửa, chỉ tác giả hoặc Staff được xóa.
+  - `ConversationService`: Bắt đầu/lấy cuộc trò chuyện 1-1, chống tự chat với bản thân (`CANNOT_CHAT_WITH_SELF`), truy cập bảo mật chỉ người tham gia (người ngoài nhận 403 Forbidden).
+  - `MessageService`: Gửi tin nhắn đa định dạng (`TEXT`, `IMAGE`, `LOCATION`), cập nhật `lastMessageAt`, đánh dấu đã đọc, đếm số tin chưa đọc.
+  - `ReviewService`: Đánh giá 1-5 sao, chặn tự đánh giá (`CANNOT_REVIEW_SELF`), chặn đánh giá trùng (`REVIEW_ALREADY_SUBMITTED`), tính toán điểm uy tín trung bình và bảng phân bố sao.
+- [x] **REST Controllers**:
+  - `FavoriteController` (`/api/v1/favorites/**`)
+  - `CommentController` (`/api/v1/comments/**`)
+  - `ConversationController` (`/api/v1/conversations/**`)
+  - `ReviewController` (`/api/v1/reviews/**`)
+- [x] **Kiểm Thử Độc Lập**:
+  - 48 tests đạt 100% PASS (0 failures, 0 errors): `FavoriteServiceTest` (9), `CommentServiceTest` (9), `ConversationServiceTest` (7), `MessageServiceTest` (5), `ReviewServiceTest` (7), `InteractionSecuritySuiteTest` (5), `InteractionControllerIntegrationTest` (6).
+
+### 2. Transaction Service (Port 8084 — `stu_transaction_db`)
+- [x] **JPA Entities & Schema Matching**:
+  - `Transaction`: Đề xuất giao dịch, unique `transaction_code`, agreed price, meeting location & time, status.
+  - `TransactionTimeline`: Nhật ký kiểm toán toàn bộ chuyển dịch trạng thái và ghi chú của các bên.
+  - Enums: `TransactionStatus` (`REQUESTED`, `ACCEPTED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `DISPUTED`), `TransactionType` (`BUY_SELL`, `EXCHANGE`, `GIVEAWAY`).
+- [x] **Spring Data JPA Repositories**:
+  - `TransactionRepository`, `TransactionTimelineRepository`.
+- [x] **Spring Security 6 & JWT (SEC-04 Compliant)**:
+  - `UserPrincipal`, `JwtTokenValidator`, `JwtAuthFilter`, `JwtAuthenticationEntryPoint`, `SecurityConfig`, `GlobalExceptionHandler`.
+- [x] **Đồng Bộ Liên Dịch Vụ Resilient (ListingClient)**:
+  - Triển khai `ListingClient` và `ListingRestClient` sử dụng Spring 6 `RestClient`.
+  - Tự động gọi `PATCH /api/v1/listings/{id}/status` chuyển trạng thái sang `SOLD` khi giao dịch hoàn tất.
+  - Bọc try-catch và logging cảnh báo, đảm bảo nếu `listing-service` gián đoạn thì giao dịch vẫn hoàn tất an toàn.
+- [x] **Nghiệp Vụ State Machine & Ràng Buộc Cơ Sở**:
+  - `createProposal`: Người bán không thể tự mua tin của mình (`CANNOT_TRANSACT_OWN_ITEM`), sinh mã giao dịch duy nhất `TX-YYYYMMDD-XXXXXX`.
+  - `acceptProposal`: Chỉ người bán (`sellerId == currentUserId`) được chấp thuận đề xuất.
+  - `scheduleMeetup`: Lịch hẹn tại khuôn viên trường STU (Sảnh Nhà A, Sảnh Nhà C, Thư viện, Căn tin, Sân trường, Nhà xe), thời gian bắt buộc ở tương lai (`@Future`).
+  - `confirmTransaction`: Hỗ trợ 2 phương thức: mã xác nhận 6 số từ người mua HOẶC xác nhận kép 2 phía. Khi đạt đủ điều kiện, chuyển `COMPLETED` và kích hoạt đồng bộ `SOLD`.
+  - `cancelTransaction`: Hủy với lý do bắt buộc trước khi hoàn tất giao dịch.
+  - `disputeTransaction`: Báo cáo tranh chấp/sự cố tại buổi hẹn (`DISPUTED`).
+  - `getCampusLocations`: Danh mục địa điểm hẹn an toàn tại STU 180 Cao Lỗ.
+- [x] **REST Controller**:
+  - `TransactionController` (`/api/v1/transactions/**`)
+- [x] **Kiểm Thử Độc Lập**:
+  - 29 tests đạt 100% PASS (0 failures, 0 errors): `TransactionServiceTest` (18), `TransactionSecuritySuiteTest` (5), `TransactionControllerIntegrationTest` (6).
+
+### 3. Quy Tắc Cách Ly Dữ Liệu (R3 Compliance)
+- 100% tuân thủ nguyên tắc microservices:
+  - 0 Foreign Key xuyên database giữa `stu_interaction_db`, `stu_transaction_db` và các database khác.
+  - 0 SQL JOIN xuyên database.
+  - Tất cả liên kết chéo (`user_id`, `listing_id`, `transaction_id`) là scalar ID `BIGINT`.
+  - Không xử lý thanh toán tiền giữa sinh viên (giao dịch tiền mặt/trao đổi trực tiếp tại trường).

@@ -215,23 +215,104 @@ Trường hợp Bean Validation thất bại (HTTP 400):
 
 ---
 
-## 4. Danh Mục Mã Lỗi Nghiệp Vụ (`ErrorCode`)
+## 4. Interaction Service Endpoints (`/api/v1/favorites/**`, `/api/v1/comments/**`, `/api/v1/conversations/**`, `/api/v1/reviews/**`)
+
+### 4.1 Danh sách yêu thích (Favorites)
+- `POST /api/v1/favorites`: Thêm tin đăng vào danh sách yêu thích (yêu cầu JWT). Trả về HTTP 201 Created. Thao tác trùng ném `409 Conflict` (`FAVORITE_ALREADY_EXISTS`).
+- `POST /api/v1/favorites/toggle`: Chuyển đổi trạng thái yêu thích (nếu có thì xóa, nếu chưa thì thêm). Trả về HTTP 200 OK kèm cờ `favorited: true/false`.
+- `DELETE /api/v1/favorites/{listingId}`: Xóa tin đăng khỏi danh sách yêu thích. Trả về HTTP 200 OK.
+- `GET /api/v1/favorites/my-favorites`: Lấy danh sách tin yêu thích của người dùng hiện tại (phân trang, sắp xếp giảm dần theo thời gian tạo).
+- `GET /api/v1/favorites/check/{listingId}`: Kiểm tra tin đăng đã được lưu hay chưa (`{"favorited": true/false}`).
+- `GET /api/v1/favorites/count/{listingId}`: Lấy tổng số lượt yêu thích của một tin đăng (Public).
+
+### 4.2 Bình luận công khai & Hỏi đáp (Comments)
+- `GET /api/v1/comments/listing/{listingId}`: Lấy danh sách bình luận công khai theo cấu trúc phân cấp cây (`replies`) (Public).
+- `POST /api/v1/comments`: Đăng câu hỏi/bình luận hoặc trả lời (`parentId` tùy chọn). Trả về HTTP 201 Created.
+  - Invariant: Nếu có `parentId`, phải kiểm tra parent thuộc đúng `listingId` (chống inject bình luận chéo).
+- `PUT /api/v1/comments/{id}`: Chỉnh sửa nội dung bình luận. Yêu cầu JWT (chính chủ tác giả bình luận). Người khác sửa sẽ trả về `403 Forbidden`.
+- `DELETE /api/v1/comments/{id}`: Xóa bình luận (cascade toàn bộ phản hồi con). Yêu cầu JWT (chính chủ tác giả hoặc Staff `ROLE_ADMIN`, `ROLE_MODERATOR`).
+
+### 4.3 Trò chuyện & Nhắn tin 1-1 (Conversations & Messages)
+- `POST /api/v1/conversations`: Khởi tạo hoặc lấy cuộc trò chuyện 1-1 giữa người mua và người bán cho một tin đăng.
+  - Invariant: Chặn tự chat với chính mình (`buyerId != sellerId`, ném `CANNOT_CHAT_WITH_SELF`).
+  - Idempotent: Nếu đã tồn tại cuộc trò chuyện cho `(listingId, buyerId, sellerId)`, trả về conversation hiện có.
+- `GET /api/v1/conversations/my-conversations`: Lấy hộp thư đến của người dùng, sắp xếp theo `lastMessageAt DESC`, kèm xem trước tin nhắn mới nhất và số tin chưa đọc.
+- `GET /api/v1/conversations/{id}`: Xem chi tiết cuộc trò chuyện. Invariant: Chỉ thành viên tham gia (`buyerId` hoặc `sellerId`) mới được truy cập, người ngoài trả về `403 Forbidden`.
+- `GET /api/v1/conversations/{id}/messages`: Lấy danh sách tin nhắn phân trang theo thời gian.
+- `POST /api/v1/conversations/{id}/messages`: Gửi tin nhắn (`TEXT`, `IMAGE`, `LOCATION`). Tự động cập nhật `lastMessageAt` của cuộc trò chuyện.
+- `PATCH /api/v1/conversations/{id}/read`: Đánh dấu đã đọc các tin nhắn đến từ đối tác.
+- `GET /api/v1/conversations/unread-count`: Lấy tổng số tin nhắn chưa đọc của người dùng trên toàn hệ thống.
+
+### 4.4 Đánh giá sau giao dịch (Reviews)
+- `POST /api/v1/reviews`: Gửi đánh giá sao (1 đến 5 sao) và nhận xét sau khi giao dịch hoàn tất.
+  - Invariant 1: Không được tự đánh giá chính mình (`reviewerId != revieweeId`, ném `CANNOT_REVIEW_SELF`).
+  - Invariant 2: Mỗi người tham gia chỉ được đánh giá 1 lần duy nhất cho mỗi giao dịch (`uk_reviewer_transaction`, ném `409 REVIEW_ALREADY_SUBMITTED`).
+  - Invariant 3: Thang điểm đánh giá từ 1 đến 5 sao (`@Min(1) @Max(5)`).
+- `GET /api/v1/reviews/user/{userId}`: Xem danh sách đánh giá nhận được của một người dùng (Public).
+- `GET /api/v1/reviews/user/{userId}/summary`: Xem tổng hợp điểm uy tín trung bình và bảng phân bổ số lượng từng mức sao (1-5 sao) (Public).
+- `GET /api/v1/reviews/transaction/{transactionId}`: Xem đánh giá liên quan đến một giao dịch cụ thể.
+
+---
+
+## 5. Transaction Service Endpoints (`/api/v1/transactions/**`)
+
+### 5.1 Quản lý Đề xuất & Tiến trình Giao dịch (Transactions)
+- `POST /api/v1/transactions`: Người mua gửi đề xuất giao dịch (`REQUESTED`).
+  - Invariant 1: Chặn người bán tự mua/giao dịch tin của chính mình (`buyerId != sellerId`, ném `CANNOT_TRANSACT_OWN_ITEM`).
+  - Invariant 2: Sinh mã giao dịch duy nhất dạng `TX-YYYYMMDD-XXXXXX`.
+  - Invariant 3: Tự động ghi nhận bản ghi nhật ký lịch sử `REQUESTED` trong `transaction_timeline`.
+- `GET /api/v1/transactions/{id}`: Lấy chi tiết thông tin giao dịch, địa điểm hẹn, mã xác nhận và dòng thời gian xử lý. Quyền hạn: Người mua, người bán hoặc Staff.
+- `GET /api/v1/transactions/my-transactions`: Tra cứu danh sách giao dịch của tôi với bộ lọc vai trò (`role=BUYER/SELLER/ALL`), trạng thái giao dịch (`status`) và phân trang.
+- `GET /api/v1/transactions/{id}/timeline`: Lấy nhật ký dòng thời gian chi tiết các bước chuyển trạng thái và ghi chú của các bên.
+- `PATCH /api/v1/transactions/{id}/accept`: Người bán chấp thuận đề xuất giao dịch (`ACCEPTED`).
+  - Invariant: Chỉ người bán (`sellerId == currentUserId`) mới được chấp thuận. Trạng thái hiện tại phải là `REQUESTED`.
+- `PATCH /api/v1/transactions/{id}/meetup`: Đặt lịch hẹn gặp tại khuôn viên trường STU (`CONFIRMED`).
+  - Invariant 1: Thời gian hẹn (`meetingTime`) bắt buộc phải ở tương lai (`@Future`).
+  - Invariant 2: Địa điểm hẹn phải thuộc các khu vực an toàn trong trường STU (Sảnh Nhà A, Sảnh Nhà C, Thư viện STU, Căn tin STU, Sân trường STU, Nhà xe sinh viên).
+- `PATCH /api/v1/transactions/{id}/confirm`: Xác nhận hoàn tất bàn giao và thanh toán trực tiếp tại trường (`COMPLETED`).
+  - Hỗ trợ 2 phương thức an toàn:
+    - **Quy trình Mã Xác Nhận (Verification Code)**: Người mua cung cấp mã bảo mật 6 số cho người bán tại buổi gặp; người bán nhập mã để hoàn tất tức thì.
+    - **Quy trình Xác Nhận Kép (Dual Confirmation)**: Cả người mua và người bán đều gửi xác nhận; hệ thống kiểm tra nhật ký timeline khi đủ xác nhận 2 phía sẽ chuyển `COMPLETED`.
+  - **Đồng bộ liên Microservice**: Khi giao dịch chuyển sang `COMPLETED`, `transaction-service` gọi `ListingClient` (Spring 6 RestClient) gửi yêu cầu cập nhật trạng thái tin đăng sang `SOLD` tại `listing-service` (`PATCH /api/v1/listings/{id}/status`). Nếu `listing-service` gián đoạn, dịch vụ áp dụng logging cảnh báo và fallback an toàn để không làm nghẽn tiến trình.
+- `PATCH /api/v1/transactions/{id}/cancel`: Hủy giao dịch kèm lý do bắt buộc (`CANCELLED`). Được phép gọi bởi người mua, người bán hoặc Staff trước khi giao dịch hoàn tất.
+- `PATCH /api/v1/transactions/{id}/dispute`: Báo cáo khiếu nại/tranh chấp khi gặp sự cố tại buổi hẹn (`DISPUTED`) để chuyển ban quản trị kiểm duyệt.
+- `GET /api/v1/transactions/campus-locations`: Lấy danh mục các điểm hẹn tiêu chuẩn tại trường ĐH Công nghệ Sài Gòn (STU - 180 Cao Lỗ).
+
+---
+
+## 6. Danh Mục Mã Lỗi Nghiệp Vụ (`ErrorCode`)
 
 | Mã Lỗi | HTTP Status | Thông Điệp Lỗi | Ý Nghĩa Nghiệp Vụ |
 |---|:---:|---|---|
-| `1000` | 400 | User not found | Không tìm thấy tài khoản người dùng |
-| `1001` | 400 | User already exists | Email đã được đăng ký trong hệ thống |
-| `1002` | 401 | Invalid credentials | Email/Mã sinh viên hoặc mật khẩu không chính xác |
-| `1003` | 401 | Unauthorized access | Chưa cung cấp hoặc token JWT không hợp lệ/hết hạn |
-| `1004` | 403 | Access denied | Tài khoản không đủ quyền hạn truy cập |
-| `1009` | 400 | Student code already exists | Mã sinh viên đã được đăng ký bởi tài khoản khác |
-| `1010` | 400 | Verification already submitted | Đã có yêu cầu xác minh đang chờ duyệt |
-| `1011` | 404 | Verification request not found | Không tìm thấy hồ sơ xác minh sinh viên |
-| `1012` | 400 | Invalid or expired password reset token | Token đặt lại mật khẩu không hợp lệ hoặc quá hạn |
-| `1013` | 400 | Refresh token not found or revoked | Refresh token không tồn tại hoặc đã bị thu hồi |
-| `2000` | 404 | Listing not found | Không tìm thấy tin đăng |
-| `2001` | 400 | Invalid listing status | Trạng thái chuyển đổi tin đăng không hợp lệ |
-| `2002` | 403 | Unauthorized listing action | Không có quyền thao tác trên tin đăng của người khác |
-| `2003` | 404 | Category not found | Danh mục không tồn tại |
-| `2004` | 400 | Maximum images exceeded | Vượt quá số lượng ảnh tối đa (tối đa 10 ảnh) |
-| `2006` | 400 | Category slug already exists | Slug danh mục đã bị trùng |
+| `1001` | 404 | User profile not found | Không tìm thấy tài khoản người dùng |
+| `1002` | 409 | User with this email already exists | Email đã được đăng ký trong hệ thống |
+| `1003` | 401 | Invalid email or password | Email hoặc mật khẩu không chính xác |
+| `1004` | 403 | Student identity card has not been verified yet | Thẻ sinh viên chưa được duyệt |
+| `1006` | 401 | JWT authentication token has expired | Token JWT đã hết hạn |
+| `1007` | 401 | JWT authentication token signature is invalid | Chữ ký token JWT không hợp lệ |
+| `1008` | 403 | User account is suspended or banned | Tài khoản bị tạm khóa hoặc cấm |
+| `1009` | 409 | Student ID code is already registered | Mã sinh viên đã được đăng ký |
+| `1014` | 403 | User account is locked or suspended | Tài khoản bị khóa (SEC-04) |
+| `2001` | 404 | Listing item not found | Không tìm thấy tin đăng |
+| `2002` | 404 | Listing category not found | Danh mục không tồn tại |
+| `2003` | 403 | User is not authorized to edit or delete this listing | Không có quyền thao tác tin của người khác |
+| `2004` | 400 | Cannot transition listing to requested status | Trạng thái chuyển đổi tin đăng không hợp lệ |
+| `2005` | 400 | Maximum number of listing images exceeded | Vượt quá số lượng ảnh tối đa |
+| `2007` | 400 | Listing must be reviewed and approved by a moderator | Tin đăng chưa được phê duyệt |
+| `3001` | 404 | Conversation not found | Cuộc trò chuyện không tồn tại |
+| `3002` | 404 | Message not found | Tin nhắn không tồn tại |
+| `3003` | 409 | Item is already in user's favorites | Tin đã có trong danh sách yêu thích |
+| `3004` | 409 | Review has already been submitted for this transaction | Đã gửi đánh giá cho giao dịch này |
+| `3005` | 404 | Comment not found | Bình luận không tồn tại |
+| `3006` | 403 | User is not authorized to perform this interaction action | Không có quyền thao tác trên bình luận/tin nhắn |
+| `3007` | 400 | User cannot start conversation with themselves | Không thể tự nhắn tin với chính mình |
+| `3008` | 400 | User cannot review themselves | Không thể tự đánh giá chính mình |
+| `3009` | 400 | Review can only be submitted for completed transactions | Chỉ đánh giá giao dịch đã hoàn tất |
+| `3010` | 404 | Favorite item not found | Không tìm thấy tin trong mục yêu thích |
+| `4001` | 404 | Transaction record not found | Giao dịch không tồn tại |
+| `4002` | 400 | Illegal transaction status change | Trạng thái chuyển đổi giao dịch không hợp lệ |
+| `4003` | 400 | Seller cannot transact or buy their own listing | Người bán không thể tự mua đồ của mình |
+| `4004` | 403 | User is not authorized to modify this transaction | Không có quyền thao tác trên giao dịch này |
+| `4005` | 400 | Meeting time must be in the future | Thời gian hẹn phải ở tương lai |
+| `4006` | 400 | Transaction verification code is invalid | Mã xác nhận giao dịch không hợp lệ |
+| `4007` | 400 | Transaction has already been completed or cancelled | Giao dịch đã kết thúc, không thể thay đổi |

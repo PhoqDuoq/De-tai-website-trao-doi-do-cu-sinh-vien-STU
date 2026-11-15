@@ -55,6 +55,26 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> created(T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .code(ErrorCode.CREATED.getCode())
+                .message(ErrorCode.CREATED.getMessage())
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    public static <T> ApiResponse<T> created(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .code(ErrorCode.CREATED.getCode())
+                .message(message)
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
     public static <T> ApiResponse<T> error(int code, String message) {
         return ApiResponse.<T>builder()
                 .success(false)

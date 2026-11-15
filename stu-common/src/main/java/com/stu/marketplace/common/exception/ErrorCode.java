@@ -52,11 +52,21 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND(3002, "Message not found", HttpStatus.NOT_FOUND),
     FAVORITE_ALREADY_EXISTS(3003, "Item is already in user's favorites", HttpStatus.CONFLICT),
     REVIEW_ALREADY_SUBMITTED(3004, "Review has already been submitted for this transaction", HttpStatus.CONFLICT),
+    COMMENT_NOT_FOUND(3005, "Comment not found", HttpStatus.NOT_FOUND),
+    UNAUTHORIZED_INTERACTION_ACTION(3006, "User is not authorized to perform this interaction action", HttpStatus.FORBIDDEN),
+    CANNOT_CHAT_WITH_SELF(3007, "User cannot start conversation with themselves", HttpStatus.BAD_REQUEST),
+    CANNOT_REVIEW_SELF(3008, "User cannot review themselves", HttpStatus.BAD_REQUEST),
+    TRANSACTION_NOT_COMPLETED(3009, "Review can only be submitted for completed transactions", HttpStatus.BAD_REQUEST),
+    FAVORITE_NOT_FOUND(3010, "Favorite item not found", HttpStatus.NOT_FOUND),
 
     // Transaction Service (4000 - 4999)
     TRANSACTION_NOT_FOUND(4001, "Transaction record not found", HttpStatus.NOT_FOUND),
     INVALID_TRANSACTION_STATUS(4002, "Illegal transaction status change", HttpStatus.BAD_REQUEST),
     CANNOT_TRANSACT_OWN_ITEM(4003, "Seller cannot transact or buy their own listing", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED_TRANSACTION_ACTION(4004, "User is not authorized to modify this transaction", HttpStatus.FORBIDDEN),
+    INVALID_MEETING_TIME(4005, "Meeting time must be in the future", HttpStatus.BAD_REQUEST),
+    INVALID_VERIFICATION_CODE(4006, "Transaction verification code is invalid", HttpStatus.BAD_REQUEST),
+    TRANSACTION_ALREADY_TERMINATED(4007, "Transaction has already been completed or cancelled", HttpStatus.BAD_REQUEST),
 
     // Moderation Service (5000 - 5999)
     REPORT_NOT_FOUND(5001, "Moderation report not found", HttpStatus.NOT_FOUND),
