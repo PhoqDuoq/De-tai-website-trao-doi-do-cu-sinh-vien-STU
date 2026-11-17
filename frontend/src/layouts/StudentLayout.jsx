@@ -121,6 +121,7 @@ export function StudentLayout({ children }) {
                     title="Thông báo"
                   >
                     <Bell className="w-5 h-5" />
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
                   </Link>
 
                   {/* User Profile Dropdown */}
@@ -219,6 +220,15 @@ export function StudentLayout({ children }) {
                           >
                             <MessageSquare className="w-4 h-4 text-slate-400" />
                             Tin nhắn trao đổi
+                          </Link>
+
+                          <Link
+                            to="/notifications"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <Bell className="w-4 h-4 text-slate-400" />
+                            Thông báo của tôi
                           </Link>
 
                           {user.verificationStatus !== 'VERIFIED' && (

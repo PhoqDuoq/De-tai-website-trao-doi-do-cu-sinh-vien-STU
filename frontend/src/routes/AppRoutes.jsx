@@ -23,6 +23,7 @@ import { MessagesPage } from '@/pages/student/MessagesPage';
 import { TransactionsPage } from '@/pages/student/TransactionsPage';
 import { ProfilePage } from '@/pages/student/ProfilePage';
 import { PostingFeePage } from '@/pages/student/PostingFeePage';
+import { NotificationsPage } from '@/pages/student/NotificationsPage';
 import { EditListingPage } from '@/pages/student/EditListingPage';
 import { ModeratorDashboard } from '@/pages/moderator/ModeratorDashboard';
 import { ModeratorListingsPage } from '@/pages/moderator/ModeratorListingsPage';
@@ -134,6 +135,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={['STUDENT', 'MODERATOR', 'ADMIN']}>
               <PostingFeePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['STUDENT', 'MODERATOR', 'ADMIN']}>
+              <NotificationsPage />
             </ProtectedRoute>
           }
         />

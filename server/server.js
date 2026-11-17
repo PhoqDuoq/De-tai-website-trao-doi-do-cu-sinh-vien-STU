@@ -138,6 +138,34 @@ async function initDatabaseDefaults() {
         (4, 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=600&auto=format&fit=crop&q=80', 0, 1);
       `);
     }
+    // 3. Ensure Notifications Table in stu_interaction_db
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stu_interaction_db.notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'SYSTEM',
+        reference_id INT NULL,
+        link_url VARCHAR(255) NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    const [notifRows] = await pool.query('SELECT count(*) as count FROM stu_interaction_db.notifications');
+    if (notifRows[0].count === 0) {
+      await pool.query(`
+        INSERT INTO stu_interaction_db.notifications (user_id, title, content, type, link_url, is_read, created_at)
+        VALUES
+        (3, 'Đề nghị hẹn gặp giao dịch mới', 'Lê Thảo Vy (DH52201456) đã gửi đề nghị hẹn gặp giao dịch cho món đồ \"Laptop Dell Latitude E5470\" tại Sảnh A lúc 14:30.', 'TRANSACTION', '/transactions', 0, NOW()),
+        (3, 'Xác thực thẻ sinh viên STU thành công', 'Hồ sơ xác minh thẻ SV MSSV DH52201642 của bạn đã được Ban Cố Vấn trường STU phê duyệt chính thức.', 'VERIFICATION', '/profile', 0, DATE_SUB(NOW(), INTERVAL 1 HOUR)),
+        (3, 'Tin nhắn trao đổi mới từ bạn học', 'Trần Hoài Phong (DH52100889) đã gửi tin nhắn: \"Còn đầy đủ mic rời với hộp luôn bạn ơi, mai 9h sáng mình có tiết ở khu C STU nè.\"', 'MESSAGE', '/messages', 0, DATE_SUB(NOW(), INTERVAL 3 HOUR)),
+        (3, 'Kích hoạt gói Tin đăng nổi bật STU', 'Gói đẩy bài Trang chủ STU của bạn đã được kích hoạt thành công (thời hạn 7 ngày).', 'SYSTEM', '/my-listings', 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+        (3, 'Nhắc nhở an toàn từ Ban Cố vấn STU', 'Để tránh rủi ro, sinh viên STU vui lòng chỉ hẹn gặp và kiểm tra đồ dùng trực tiếp trong khuôn viên trường (180 Cao Lỗ).', 'SYSTEM', '/transactions', 1, DATE_SUB(NOW(), INTERVAL 2 DAY));
+      `);
+    }
+
     console.log('✅ CSDL MySQL trên WampServer đã được khởi tạo và kiểm tra thành công!');
   } catch (err) {
     console.error('Lỗi khởi tạo CSDL:', err.message);
@@ -756,6 +784,74 @@ app.post('/api/v1/transactions', authenticateToken, async (req, res) => {
     );
 
     return success(res, { id: result.insertId, transactionCode: txCode }, 'Đã gửi đề nghị hẹn gặp giao dịch tại STU!', 201);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// ==========================================
+// NOTIFICATIONS API ENDPOINTS
+// ==========================================
+
+// Get Notifications for Current Student
+app.get('/api/v1/notifications', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM stu_interaction_db.notifications
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+
+    const [unreadResult] = await pool.query(
+      `SELECT count(*) as unreadCount FROM stu_interaction_db.notifications
+       WHERE user_id = ? AND is_read = 0`,
+      [req.user.id]
+    );
+
+    return success(res, {
+      notifications: rows,
+      unreadCount: unreadResult[0].unreadCount || 0,
+    });
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Mark Single Notification as Read
+app.patch('/api/v1/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE stu_interaction_db.notifications SET is_read = 1 WHERE id = ? AND user_id = ?',
+      [req.params.id, req.user.id]
+    );
+    return success(res, { id: req.params.id, is_read: 1 }, 'Đã đánh dấu đã đọc');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Mark All Notifications as Read
+app.patch('/api/v1/notifications/mark-all-read', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE stu_interaction_db.notifications SET is_read = 1 WHERE user_id = ?',
+      [req.user.id]
+    );
+    return success(res, null, 'Đã đánh dấu tất cả là đã đọc');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Delete Notification
+app.delete('/api/v1/notifications/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM stu_interaction_db.notifications WHERE id = ? AND user_id = ?',
+      [req.params.id, req.user.id]
+    );
+    return success(res, null, 'Đã xóa thông báo');
   } catch (err) {
     return failure(res, err.message, 500);
   }
