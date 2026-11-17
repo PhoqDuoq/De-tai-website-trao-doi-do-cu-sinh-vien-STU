@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpen,
@@ -16,15 +16,35 @@ import {
   Tag,
   Clock,
   CheckCircle2,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { listingApi } from '@/api/listingApi';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge, VerificationBadge } from '@/components/ui/Badge';
-import { formatVND } from '@/lib/utils';
+import { formatVND, formatDate } from '@/lib/utils';
 
 export function HomePage() {
   const { user, isAuthenticated } = useAuth();
+  const [liveListings, setLiveListings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchLiveListings() {
+      try {
+        const res = await listingApi.getListings({ size: 8 });
+        if (res && res.data && res.data.content && res.data.content.length > 0) {
+          setLiveListings(res.data.content);
+        }
+      } catch (err) {
+        console.warn('Could not load live listings, using fallback showcase:', err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchLiveListings();
+  }, []);
 
   const categories = [
     {
@@ -229,16 +249,26 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {sampleListings.map((item) => (
-              <Card key={item.id} className="overflow-hidden group hover:border-stu-blue/40">
-                {/* Image Placeholder */}
+            {(liveListings.length > 0 ? liveListings : sampleListings).map((item) => (
+              <Card key={item.id} className="overflow-hidden group hover:border-stu-blue/40 shadow-xs hover:shadow-md transition-all">
+                {/* Image Section */}
                 <div className="h-44 bg-slate-100 flex items-center justify-center relative overflow-hidden">
-                  <div className="text-center p-4">
-                    <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-[11px] text-slate-400 font-medium">{item.category}</span>
-                  </div>
+                  {item.primaryImageUrl ? (
+                    <img
+                      src={item.primaryImageUrl}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="text-center p-4">
+                      <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {item.categoryName || item.category || 'Đồ dùng STU'}
+                      </span>
+                    </div>
+                  )}
                   <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-xs text-[10px] font-semibold text-slate-700 shadow-2xs">
-                    {item.condition}
+                    {item.itemCondition === 'BRAND_NEW' ? 'Mới 100%' : item.itemCondition === 'LIKE_NEW' ? 'Mới 99%' : item.condition || 'Còn tốt'}
                   </span>
                 </div>
 
@@ -253,19 +283,19 @@ export function HomePage() {
                     </span>
                     <span className="text-[10px] text-slate-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {item.time}
+                      {item.createdAt ? formatDate(item.createdAt).split(' ')[1] || 'Hôm nay' : item.time || 'Vừa đăng'}
                     </span>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                     <div className="flex items-center gap-1.5 truncate max-w-[140px]">
-                      <span className="font-medium truncate">{item.seller}</span>
-                      {item.isVerified && <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />}
+                      <span className="font-medium truncate">{item.sellerName || item.seller || 'Sinh viên STU'}</span>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                     </div>
 
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400 flex-shrink-0">
-                      <MapPin className="w-3 h-3 text-stu-blue" />
-                      {item.location}
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400 flex-shrink-0 truncate max-w-[120px]">
+                      <MapPin className="w-3 h-3 text-stu-blue flex-shrink-0" />
+                      <span className="truncate">{item.locationNotes || item.location || 'STU'}</span>
                     </span>
                   </div>
                 </CardContent>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Sparkles } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Sparkles, GraduationCap, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { extractErrorMessage } from '@/api/client';
@@ -37,6 +37,7 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -45,6 +46,28 @@ export function LoginPage() {
       password: '',
     },
   });
+
+  const handleQuickLogin = async (email, pass, defaultRoute) => {
+    setValue('emailOrStudentCode', email);
+    setValue('password', pass);
+    setIsSubmitting(true);
+    setServerError('');
+    try {
+      const res = await login({ emailOrStudentCode: email, password: pass });
+      if (res.success) {
+        toast.success(`Đăng nhập thành công với vai trò ${res.user?.roles?.[0] || 'STU'}!`);
+        navigate(defaultRoute, { replace: true });
+      } else {
+        setServerError(res.message || 'Đăng nhập không thành công');
+      }
+    } catch (err) {
+      const msg = extractErrorMessage(err, 'Đăng nhập không thành công');
+      setServerError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const onSubmit = async (data) => {
     setServerError('');
@@ -139,6 +162,75 @@ export function LoginPage() {
               Đăng nhập ngay
             </Button>
           </form>
+
+          {/* Demo RBAC Quick Login Panel for Thesis Defense */}
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Tài khoản mẫu kiểm thử phân quyền (RBAC Demo)</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin('dh52201642@student.stu.edu.vn', 'Stu@123456', '/')
+                }
+                className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/80 text-left transition cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 text-stu-blue font-bold text-xs">
+                  <GraduationCap className="w-4 h-4 shrink-0" />
+                  <span>Sinh viên STU</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                  Hà Thiên Phúc
+                </div>
+                <div className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                  ROLE: STUDENT
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin('moderator@stu.edu.vn', 'Admin@123456', '/moderator')
+                }
+                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/80 text-left transition cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 text-indigo-700 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <span>Kiểm duyệt viên</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                  moderator@stu.edu.vn
+                </div>
+                <div className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                  ROLE: MODERATOR
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin('admin@stu.edu.vn', 'Admin@123456', '/admin')
+                }
+                className="p-2.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/80 text-left transition cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>Quản trị viên</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                  admin@stu.edu.vn
+                </div>
+                <div className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                  ROLE: ADMIN
+                </div>
+              </button>
+            </div>
+          </div>
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-3 pt-2 text-center text-xs text-slate-500">

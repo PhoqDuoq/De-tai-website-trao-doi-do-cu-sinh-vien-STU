@@ -20,6 +20,10 @@ import {
   Phone,
   Mail,
   MapPin,
+  Handshake,
+  Rocket,
+  PenSquare,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -151,7 +155,70 @@ export function StudentLayout({ children }) {
                             className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
                           >
                             <UserIcon className="w-4 h-4 text-slate-400" />
-                            Thông tin cá nhân
+                            Hồ sơ cá nhân sinh viên
+                          </Link>
+
+                          <Link
+                            to="/seller-profile"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <ShoppingBag className="w-4 h-4 text-slate-400" />
+                            Trang cá nhân người bán
+                          </Link>
+
+                          <Link
+                            to="/my-listings"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <FileText className="w-4 h-4 text-slate-400" />
+                            Quản lý tin đăng của tôi
+                          </Link>
+
+                          <Link
+                            to="/transactions"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <Handshake className="w-4 h-4 text-slate-400" />
+                            Quản lý & Hẹn gặp STU
+                          </Link>
+
+                          <Link
+                            to="/transaction-history"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            Lịch sử & Biên nhận GD
+                          </Link>
+
+                          <Link
+                            to="/posting-fee"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <Rocket className="w-4 h-4 text-slate-400" />
+                            Thanh toán phí đẩy tin
+                          </Link>
+
+                          <Link
+                            to="/favorites"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <Heart className="w-4 h-4 text-slate-400" />
+                            Tin đăng đã lưu
+                          </Link>
+
+                          <Link
+                            to="/messages"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
+                          >
+                            <MessageSquare className="w-4 h-4 text-slate-400" />
+                            Tin nhắn trao đổi
                           </Link>
 
                           {user.verificationStatus !== 'VERIFIED' && (
@@ -164,24 +231,6 @@ export function StudentLayout({ children }) {
                               Xác thực thẻ sinh viên STU
                             </Link>
                           )}
-
-                          <Link
-                            to="/my-listings"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
-                          >
-                            <FileText className="w-4 h-4 text-slate-400" />
-                            Quản lý tin đăng của tôi
-                          </Link>
-
-                          <Link
-                            to="/favorites"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-stu-blue"
-                          >
-                            <Heart className="w-4 h-4 text-slate-400" />
-                            Tin đăng đã lưu
-                          </Link>
 
                           {/* Portal Shortcuts for Staff */}
                           {isModerator && (
@@ -361,6 +410,101 @@ export function StudentLayout({ children }) {
             )}
           </div>
         )}
+
+        {/* Quick Sub-nav bar */}
+        <div className="bg-slate-50/90 border-t border-slate-200/70 hidden sm:block">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav className="flex items-center gap-1 py-1.5 overflow-x-auto text-xs font-semibold">
+              <Link
+                to="/"
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  location.pathname === '/' || location.pathname === '/listings'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                Trang chủ
+              </Link>
+              <Link
+                to="/listings/create"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname === '/listings/create' || location.pathname === '/create-post'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Đăng tin</span>
+              </Link>
+              <Link
+                to="/my-listings"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname === '/my-listings' || location.pathname === '/my-posts'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Tin của tôi</span>
+              </Link>
+              <Link
+                to="/transactions"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname.startsWith('/transaction')
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <Handshake className="w-3.5 h-3.5" />
+                <span>Giao dịch & Hẹn gặp STU</span>
+              </Link>
+              <Link
+                to="/messages"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname === '/messages' || location.pathname === '/chat'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Tin nhắn</span>
+              </Link>
+              <Link
+                to="/favorites"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname === '/favorites'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <Heart className="w-3.5 h-3.5" />
+                <span>Đã lưu</span>
+              </Link>
+              <Link
+                to="/posting-fee"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
+                  location.pathname === '/posting-fee'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <Rocket className="w-3.5 h-3.5" />
+                <span>Đẩy tin</span>
+              </Link>
+              <Link
+                to="/profile"
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ml-auto ${
+                  location.pathname === '/profile' || location.pathname === '/seller-profile'
+                    ? 'bg-stu-blue text-white font-bold'
+                    : 'text-slate-600 hover:text-stu-blue hover:bg-white'
+                }`}
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                <span>Hồ sơ SV</span>
+              </Link>
+            </nav>
+          </div>
+        </div>
       </header>
 
       {/* Main Page Content */}
