@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Receipt,
   Download,
+  Star,
   X
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
@@ -44,6 +45,12 @@ export function TransactionsPage() {
   const [selectedTx, setSelectedTx] = useState(null);
   const [receiptTx, setReceiptTx] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
+
+  // Post-transaction review state
+  const [reviewTx, setReviewTx] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Form state for creating new transaction
   const [newTxForm, setNewTxForm] = useState({
@@ -94,6 +101,26 @@ export function TransactionsPage() {
       }
     } catch (err) {
       toast.error('Không thể cập nhật trạng thái: ' + err.message);
+    }
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewTx) return;
+    setIsSubmittingReview(true);
+    try {
+      await apiClient.post(`/api/v1/transactions/${reviewTx.id}/reviews`, {
+        rating: reviewRating,
+        comment: reviewComment || 'Giao dịch nhanh chóng, đồ dùng đúng mô tả và đối tác rất thân thiện!',
+      });
+      toast.success('Đã gửi đánh giá đối tác sinh viên STU thành công!');
+      setReviewTx(null);
+      setReviewComment('');
+      setReviewRating(5);
+    } catch (err) {
+      toast.error('Không thể gửi đánh giá: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -425,13 +452,22 @@ export function TransactionsPage() {
                     )}
 
                     {selectedTx.status === 'COMPLETED' && (
-                      <button
-                        onClick={() => setReceiptTx(selectedTx)}
-                        className="px-4 py-2.5 rounded-xl bg-blue-50 text-stu-blue hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Receipt className="w-4 h-4" />
-                        <span>Xem biên nhận điện tử</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setReviewTx(selectedTx)}
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Star className="w-4 h-4 fill-white" />
+                          <span>Đánh giá đối tác</span>
+                        </button>
+                        <button
+                          onClick={() => setReceiptTx(selectedTx)}
+                          className="px-4 py-2.5 rounded-xl bg-blue-50 text-stu-blue hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Receipt className="w-4 h-4" />
+                          <span>Xem biên nhận điện tử</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -528,13 +564,25 @@ export function TransactionsPage() {
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">{getStatusBadge(t.status)}</td>
                       <td className="py-3.5 px-4 whitespace-nowrap text-right">
-                        <button
-                          onClick={() => setReceiptTx(t)}
-                          className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-stu-blue text-xs font-bold text-stu-blue hover:bg-blue-50 transition cursor-pointer flex items-center gap-1 ml-auto"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          <span>Biên nhận</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 ml-auto">
+                          {t.status === 'COMPLETED' && (
+                            <button
+                              onClick={() => setReviewTx(t)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-700 transition cursor-pointer flex items-center gap-1"
+                              title="Đánh giá đối tác sinh viên"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                              <span>Đánh giá</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setReceiptTx(t)}
+                            className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-stu-blue text-xs font-bold text-stu-blue hover:bg-blue-50 transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span>Biên nhận</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -707,6 +755,107 @@ export function TransactionsPage() {
                   className="px-5 py-2.5 rounded-xl bg-stu-blue hover:bg-stu-darkBlue text-white text-xs font-bold cursor-pointer shadow-xs"
                 >
                   Gửi đề nghị hẹn gặp
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL: ĐÁNH GIÁ ĐỐI TÁC SINH VIÊN STU */}
+      {reviewTx && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-200 relative animate-in zoom-in-95">
+            <button
+              onClick={() => setReviewTx(null)}
+              className="absolute top-4 right-4 p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center pb-3 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 mx-auto flex items-center justify-center mb-2">
+                <Star className="w-6 h-6 fill-amber-400 text-amber-500" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Đánh giá giao dịch & Đối tác STU</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Món đồ: <strong className="text-slate-700">{reviewTx.listingTitle}</strong>
+              </p>
+              <p className="text-[11px] text-stu-blue font-semibold">
+                Đối tác: {reviewTx.partnerName || 'Sinh viên STU'}
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="space-y-4 pt-4">
+              {/* Star Rating Picker */}
+              <div className="text-center">
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Bạn chấm điểm thế nào cho buổi giao dịch này?
+                </label>
+                <div className="flex items-center justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      className="p-1.5 transition-transform hover:scale-125 focus:outline-none cursor-pointer"
+                    >
+                      <Star
+                        className={`w-7 h-7 transition-colors ${
+                          star <= reviewRating
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-slate-200 fill-slate-100 hover:text-amber-200'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs font-semibold text-amber-600 mt-1 inline-block">
+                  {reviewRating === 5
+                    ? 'Tuyệt vời (5/5 sao)'
+                    : reviewRating === 4
+                    ? 'Rất tốt (4/5 sao)'
+                    : reviewRating === 3
+                    ? 'Bình thường (3/5 sao)'
+                    : reviewRating === 2
+                    ? 'Chưa hài lòng (2/5 sao)'
+                    : 'Rất tệ (1/5 sao)'}
+                </span>
+              </div>
+
+              {/* Comment text */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nhận xét về đối tác & tình trạng thực tế của đồ dùng:
+                </label>
+                <textarea
+                  rows={3}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Ví dụ: Bạn sinh viên rất đúng giờ tại Sảnh A STU, sách còn mới nguyên, giao dịch uy tín!"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:border-stu-blue focus:outline-none"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500">
+                ⭐ Đánh giá của bạn sẽ được lưu vào điểm uy tín công khai của sinh viên nhằm xây dựng cộng đồng STU an toàn, minh bạch.
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewTx(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
+                >
+                  Để sau
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReview}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <Star className="w-4 h-4 fill-white" />
+                  <span>{isSubmittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}</span>
                 </button>
               </div>
             </form>

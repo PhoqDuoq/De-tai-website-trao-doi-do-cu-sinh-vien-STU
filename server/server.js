@@ -858,6 +858,78 @@ app.delete('/api/v1/notifications/:id', authenticateToken, async (req, res) => {
 });
 
 // ==========================================
+// REPORTS & REVIEWS API ENDPOINTS
+// ==========================================
+
+// Submit Violation Report
+app.post('/api/v1/reports', authenticateToken, async (req, res) => {
+  try {
+    const { targetType = 'LISTING', targetId, reason = 'SPAM', details } = req.body;
+    const [result] = await pool.query(
+      `INSERT INTO stu_moderation_db.reports 
+       (reporter_id, target_type, target_id, reason, details, status)
+       VALUES (?, ?, ?, ?, ?, 'PENDING')`,
+      [req.user.id, targetType, targetId, reason, details || 'Báo cáo từ sinh viên STU']
+    );
+    return success(res, { id: result.insertId }, 'Đã gửi báo cáo vi phạm đến Ban Kiểm Duyệt STU!', 201);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Moderator: Get all reports
+app.get('/api/v1/moderation/reports', authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT r.*, u.full_name as reporterName, u.student_id as reporterStudentCode,
+             l.title as listingTitle
+      FROM stu_moderation_db.reports r
+      LEFT JOIN stu_identity_db.users u ON r.reporter_id = u.id
+      LEFT JOIN stu_listing_db.listings l ON r.target_type = 'LISTING' AND r.target_id = l.id
+      ORDER BY r.id DESC
+    `);
+    return success(res, rows);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Moderator: Resolve Report
+app.patch('/api/v1/moderation/reports/:id', authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
+  try {
+    const { status, resolutionAction } = req.body;
+    await pool.query(
+      `UPDATE stu_moderation_db.reports 
+       SET status = ?, resolution_action = ?, resolved_at = NOW() 
+       WHERE id = ?`,
+      [status || 'RESOLVED', resolutionAction || 'WARNING_SENT', req.params.id]
+    );
+    return success(res, null, 'Đã xử lý báo cáo vi phạm thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Submit Transaction Review
+app.post('/api/v1/transactions/:id/reviews', authenticateToken, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const [txs] = await pool.query('SELECT seller_id, buyer_id FROM stu_transaction_db.transactions WHERE id = ?', [req.params.id]);
+    const sellerId = txs.length > 0 ? txs[0].seller_id : 3;
+    const revieweeId = txs.length > 0 && req.user.id === txs[0].buyer_id ? txs[0].seller_id : (txs[0]?.buyer_id || 4);
+
+    await pool.query(
+      `INSERT INTO stu_interaction_db.reviews (reviewer_id, reviewee_id, transaction_id, rating, comment)
+       VALUES (?, ?, ?, ?, ?)`,
+      [req.user.id, revieweeId, req.params.id, Math.min(5, Math.max(1, Number(rating) || 5)), comment || 'Đồ dùng rất tốt, đúng mô tả!']
+    );
+    return success(res, null, 'Cảm ơn bạn đã gửi đánh giá đối tác sinh viên STU!', 201);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// ==========================================
 // 8. MODERATOR ENDPOINTS (RBAC PROTECTED)
 // ==========================================
 

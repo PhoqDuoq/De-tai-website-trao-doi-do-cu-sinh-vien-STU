@@ -29,6 +29,7 @@ export function HomePage() {
   const { user, isAuthenticated } = useAuth();
   const [liveListings, setLiveListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
   useEffect(() => {
     async function fetchLiveListings() {
@@ -214,18 +215,24 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((cat) => (
-              <div
-                key={cat.id}
-                className={`p-4 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col items-center text-center group ${cat.color}`}
-              >
-                <div className="p-3 rounded-2xl bg-white shadow-2xs mb-2.5 group-hover:scale-110 transition-transform">
-                  {cat.icon}
+            {categories.map((cat) => {
+              const isSelected = selectedCategoryId === cat.id;
+              return (
+                <div
+                  key={cat.id}
+                  onClick={() => setSelectedCategoryId(isSelected ? null : cat.id)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col items-center text-center group ${cat.color} ${
+                    isSelected ? 'ring-2 ring-stu-blue shadow-md scale-102 border-stu-blue font-bold' : ''
+                  }`}
+                >
+                  <div className="p-3 rounded-2xl bg-white shadow-2xs mb-2.5 group-hover:scale-110 transition-transform">
+                    {cat.icon}
+                  </div>
+                  <h3 className="text-xs font-bold text-slate-800 leading-snug">{cat.name}</h3>
+                  <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">{cat.description}</p>
                 </div>
-                <h3 className="text-xs font-bold text-slate-800 leading-snug">{cat.name}</h3>
-                <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">{cat.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -235,72 +242,113 @@ export function HomePage() {
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-stu-orange" />
-                <span>Tin đăng mới nhất từ sinh viên</span>
+                <span>
+                  {selectedCategoryId
+                    ? `Danh mục: ${categories.find((c) => c.id === selectedCategoryId)?.name}`
+                    : 'Tin đăng mới nhất từ sinh viên'}
+                </span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Các món đồ vừa được sinh viên STU đăng bán hôm nay</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {selectedCategoryId
+                  ? 'Đang lọc các bài đăng thuộc danh mục đã chọn'
+                  : 'Các món đồ vừa được sinh viên STU đăng bán hôm nay'}
+              </p>
             </div>
 
-            <Link
-              to="/listings"
-              className="text-xs font-semibold text-stu-blue hover:text-stu-darkBlue transition-colors"
-            >
-              Xem tất cả tin →
-            </Link>
+            {selectedCategoryId ? (
+              <button
+                onClick={() => setSelectedCategoryId(null)}
+                className="text-xs font-semibold text-stu-blue hover:underline"
+              >
+                ✕ Xóa bộ lọc danh mục
+              </button>
+            ) : (
+              <Link
+                to="/listings"
+                className="text-xs font-semibold text-stu-blue hover:text-stu-darkBlue transition-colors"
+              >
+                Xem tất cả tin →
+              </Link>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {(liveListings.length > 0 ? liveListings : sampleListings).map((item) => (
-              <Card key={item.id} className="overflow-hidden group hover:border-stu-blue/40 shadow-xs hover:shadow-md transition-all">
-                {/* Image Section */}
-                <div className="h-44 bg-slate-100 flex items-center justify-center relative overflow-hidden">
-                  {item.primaryImageUrl ? (
-                    <img
-                      src={item.primaryImageUrl}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="text-center p-4">
-                      <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {item.categoryName || item.category || 'Đồ dùng STU'}
+            {(liveListings.length > 0 ? liveListings : sampleListings)
+              .filter((item) => {
+                if (!selectedCategoryId) return true;
+                return (
+                  item.categoryId === selectedCategoryId ||
+                  item.category_id === selectedCategoryId
+                );
+              })
+              .map((item) => (
+                <Link
+                  to={`/listings/${item.id}`}
+                  key={item.id}
+                  className="block group"
+                >
+                  <Card className="h-full overflow-hidden group-hover:border-stu-blue/40 shadow-xs hover:shadow-md transition-all">
+                    {/* Image Section */}
+                    <div className="h-44 bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                      {item.primaryImageUrl ? (
+                        <img
+                          src={item.primaryImageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="text-center p-4">
+                          <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {item.categoryName || item.category || 'Đồ dùng STU'}
+                          </span>
+                        </div>
+                      )}
+                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-xs text-[10px] font-semibold text-slate-700 shadow-2xs">
+                        {item.itemCondition === 'BRAND_NEW'
+                          ? 'Mới 100%'
+                          : item.itemCondition === 'LIKE_NEW'
+                          ? 'Mới 99%'
+                          : item.condition || 'Còn tốt'}
                       </span>
                     </div>
-                  )}
-                  <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-xs text-[10px] font-semibold text-slate-700 shadow-2xs">
-                    {item.itemCondition === 'BRAND_NEW' ? 'Mới 100%' : item.itemCondition === 'LIKE_NEW' ? 'Mới 99%' : item.condition || 'Còn tốt'}
-                  </span>
-                </div>
 
-                <CardContent className="p-4 space-y-2.5">
-                  <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-stu-blue transition-colors">
-                    {item.title}
-                  </h3>
+                    <CardContent className="p-4 space-y-2.5">
+                      <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-stu-blue transition-colors">
+                        {item.title}
+                      </h3>
 
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-base font-extrabold text-stu-orange">
-                      {formatVND(item.price)}
-                    </span>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {item.createdAt ? formatDate(item.createdAt).split(' ')[1] || 'Hôm nay' : item.time || 'Vừa đăng'}
-                    </span>
-                  </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-base font-extrabold text-stu-orange">
+                          {formatVND(item.price)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {item.createdAt
+                            ? formatDate(item.createdAt).split(' ')[1] || 'Hôm nay'
+                            : item.time || 'Vừa đăng'}
+                        </span>
+                      </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <div className="flex items-center gap-1.5 truncate max-w-[140px]">
-                      <span className="font-medium truncate">{item.sellerName || item.seller || 'Sinh viên STU'}</span>
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
-                    </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                        <div className="flex items-center gap-1.5 truncate max-w-[140px]">
+                          <span className="font-medium truncate">
+                            {item.sellerName || item.seller || 'Sinh viên STU'}
+                          </span>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                        </div>
 
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400 flex-shrink-0 truncate max-w-[120px]">
-                      <MapPin className="w-3 h-3 text-stu-blue flex-shrink-0" />
-                      <span className="truncate">{item.locationNotes || item.location || 'STU'}</span>
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                        <span className="flex items-center gap-1 text-[10px] text-slate-400 flex-shrink-0 truncate max-w-[120px]">
+                          <MapPin className="w-3 h-3 text-stu-blue flex-shrink-0" />
+                          <span className="truncate">
+                            {item.locationNotes || item.location || 'STU'}
+                          </span>
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
           </div>
         </section>
 

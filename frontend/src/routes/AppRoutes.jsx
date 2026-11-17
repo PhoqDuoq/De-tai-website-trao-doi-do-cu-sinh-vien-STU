@@ -16,6 +16,7 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 
 // Portal Dashboards / Pages
 import { HomePage } from '@/pages/student/HomePage';
+import { ListingDetailPage } from '@/pages/student/ListingDetailPage';
 import { CreateListingPage } from '@/pages/student/CreateListingPage';
 import { MyListingsPage } from '@/pages/student/MyListingsPage';
 import { FavoritesPage } from '@/pages/student/FavoritesPage';
@@ -27,6 +28,7 @@ import { NotificationsPage } from '@/pages/student/NotificationsPage';
 import { EditListingPage } from '@/pages/student/EditListingPage';
 import { ModeratorDashboard } from '@/pages/moderator/ModeratorDashboard';
 import { ModeratorListingsPage } from '@/pages/moderator/ModeratorListingsPage';
+import { ModeratorReportsPage } from '@/pages/moderator/ModeratorReportsPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -47,6 +49,8 @@ export function AppRoutes() {
         {/* Public browse routes */}
         <Route path="/" element={<HomePage />} />
         <Route path="/listings" element={<HomePage />} />
+        <Route path="/listings/:id" element={<ListingDetailPage />} />
+        <Route path="/san-pham/:id" element={<ListingDetailPage />} />
         <Route path="/seller-profile" element={<ProfilePage />} />
 
         {/* Protected Student Action Routes */}
@@ -192,15 +196,7 @@ export function AppRoutes() {
         <Route index element={<ModeratorDashboard />} />
         <Route path="verifications" element={<ModeratorDashboard />} />
         <Route path="listings" element={<ModeratorListingsPage />} />
-        <Route
-          path="reports"
-          element={
-            <div className="p-8 text-center bg-white rounded-3xl border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">Xử lý báo cáo vi phạm STU</h3>
-              <p className="text-xs text-slate-500 mt-1">Hiện không có báo cáo vi phạm mới nào từ sinh viên.</p>
-            </div>
-          }
-        />
+        <Route path="reports" element={<ModeratorReportsPage />} />
         <Route
           path="keywords"
           element={
