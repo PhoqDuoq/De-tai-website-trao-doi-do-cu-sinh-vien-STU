@@ -45,40 +45,71 @@ function failure(res, message = 'Error', code = 400) {
 }
 
 // Authentication Middleware (with demo-friendly fallback to Hà Thiên Phúc if unauthenticated)
-function authenticateToken(req, res, next) {
+// Authentication Middleware (with real-time lock status verification in MySQL)
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    // Demo fallback: default to student Hà Thiên Phúc
-    req.user = {
-      id: 3,
-      email: 'dh52201642@student.stu.edu.vn',
-      fullName: 'Hà Thiên Phúc (SV STU)',
-      studentCode: 'DH52201642',
-      roles: ['STUDENT'],
-      status: 'ACTIVE',
-      verificationStatus: 'VERIFIED',
-    };
-    return next();
+  let userId = null;
+  let decodedUser = null;
+
+  if (token) {
+    try {
+      decodedUser = jwt.verify(token, JWT_SECRET);
+      userId = decodedUser.id;
+    } catch (err) {
+      return failure(res, 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.', 401);
+    }
+  } else {
+    // Demo fallback for guest calls: user #3
+    userId = 3;
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      req.user = {
-        id: 3,
-        email: 'dh52201642@student.stu.edu.vn',
-        fullName: 'Hà Thiên Phúc (SV STU)',
-        studentCode: 'DH52201642',
-        roles: ['STUDENT'],
-        status: 'ACTIVE',
-        verificationStatus: 'VERIFIED',
-      };
+  // Real-time check against stu_identity_db.users in MySQL
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id, u.email, u.full_name as fullName, u.student_id as studentCode,
+              u.role, u.status,
+              (SELECT status FROM stu_identity_db.user_verifications WHERE user_id = u.id ORDER BY id DESC LIMIT 1) as verificationStatus
+       FROM stu_identity_db.users u
+       WHERE u.id = ?`,
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return failure(res, 'Tài khoản người dùng không tồn tại trên hệ thống STU', 401);
+    }
+
+    const dbUser = rows[0];
+
+    // Enforce lock status immediately
+    if (dbUser.status === 'LOCKED' || dbUser.status === 'BANNED' || dbUser.status === 'SUSPENDED') {
+      return failure(
+        res,
+        'Tài khoản STU của bạn đã bị KHÓA do vi phạm quy chế sàn. Mọi thao tác giao dịch, đăng bài và nhắn tin đã bị đình chỉ.',
+        403
+      );
+    }
+
+    req.user = {
+      id: dbUser.id,
+      email: dbUser.email,
+      fullName: dbUser.fullName,
+      studentCode: dbUser.studentCode,
+      role: dbUser.role,
+      roles: [dbUser.role],
+      status: dbUser.status,
+      verificationStatus: dbUser.verificationStatus || 'VERIFIED',
+    };
+    next();
+  } catch (dbErr) {
+    console.error('authenticateToken DB check error:', dbErr);
+    if (decodedUser) {
+      req.user = decodedUser;
       return next();
     }
-    req.user = user;
-    next();
-  });
+    return failure(res, 'Lỗi xác thực người dùng: ' + dbErr.message, 500);
+  }
 }
 
 // Role-Based Access Control (RBAC) Middleware
@@ -103,6 +134,11 @@ function requireRole(...allowedRoles) {
 // Helper to seed initial accounts
 async function initDatabaseDefaults() {
   try {
+    // 0. Ensure status column in stu_identity_db.users supports 'LOCKED', 'ACTIVE', 'BANNED'
+    try {
+      await pool.query('ALTER TABLE stu_identity_db.users MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT "ACTIVE"');
+    } catch (e) {}
+
     const defaultPassword = await bcrypt.hash('Stu@123456', 10);
     const adminPassword = await bcrypt.hash('Admin@123456', 10);
 
@@ -284,8 +320,12 @@ app.post('/api/v1/auth/login', async (req, res) => {
       return failure(res, 'Mật khẩu không chính xác', 401);
     }
 
-    if (user.status === 'BANNED' || user.status === 'SUSPENDED') {
-      return failure(res, 'Tài khoản của bạn đã bị tạm khóa do vi phạm quy chế STU', 403);
+    if (user.status === 'LOCKED' || user.status === 'BANNED' || user.status === 'SUSPENDED') {
+      return failure(
+        res,
+        'Tài khoản STU của bạn đã bị KHÓA do vi phạm quy chế sàn. Vui lòng liên hệ Quản trị viên hoặc Phòng Công tác Sinh viên STU.',
+        403
+      );
     }
 
     const tokenPayload = {
@@ -1058,13 +1098,46 @@ app.get('/api/v1/admin/users', authenticateToken, requireRole('ADMIN'), async (r
 app.patch('/api/v1/admin/users/:id/status', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const { status, role } = req.body;
+    const targetUserId = req.params.id;
+
     if (status) {
-      await pool.query('UPDATE stu_identity_db.users SET status = ? WHERE id = ?', [status, req.params.id]);
+      await pool.query('UPDATE stu_identity_db.users SET status = ? WHERE id = ?', [status, targetUserId]);
+
+      if (status === 'LOCKED' || status === 'BANNED' || status === 'SUSPENDED') {
+        // Automatically hide all active listings of the locked user
+        await pool.query('UPDATE stu_listing_db.listings SET status = "HIDDEN" WHERE seller_id = ? AND status = "ACTIVE"', [targetUserId]);
+
+        // Send high-priority alert notification
+        try {
+          await pool.query(
+            `INSERT INTO stu_interaction_db.notifications (user_id, title, content, type, link_url)
+             VALUES (?, 'Tài khoản của bạn đã bị KHÓA', 'Quản trị viên đã khóa tài khoản của bạn do vi phạm quy chế STU. Toàn bộ tin đăng đã bị ẩn và quyền giao dịch bị đình chỉ.', 'SYSTEM', '/profile')`,
+            [targetUserId]
+          );
+        } catch (e) {}
+      } else if (status === 'ACTIVE') {
+        // Restore listings when unlocked
+        await pool.query('UPDATE stu_listing_db.listings SET status = "ACTIVE" WHERE seller_id = ? AND status = "HIDDEN"', [targetUserId]);
+
+        try {
+          await pool.query(
+            `INSERT INTO stu_interaction_db.notifications (user_id, title, content, type, link_url)
+             VALUES (?, 'Tài khoản đã được MỞ KHÓA', 'Quản trị viên đã kích hoạt lại tài khoản của bạn. Bạn có thể tiếp tục sử dụng đầy đủ chức năng của Sàn.', 'SYSTEM', '/')`,
+            [targetUserId]
+          );
+        } catch (e) {}
+      }
     }
+
     if (role) {
-      await pool.query('UPDATE stu_identity_db.users SET role = ? WHERE id = ?', [role, req.params.id]);
+      await pool.query('UPDATE stu_identity_db.users SET role = ? WHERE id = ?', [role, targetUserId]);
     }
-    return success(res, { id: req.params.id, status, role }, 'Cập nhật tài khoản người dùng thành công!');
+
+    const message = status === 'LOCKED'
+      ? 'Đã khóa tài khoản thành công! Toàn bộ tin đăng của người dùng đã bị ẩn và quyền truy cập bị đình chỉ.'
+      : 'Cập nhật tài khoản người dùng thành công!';
+
+    return success(res, { id: targetUserId, status, role }, message);
   } catch (err) {
     return failure(res, err.message, 500);
   }

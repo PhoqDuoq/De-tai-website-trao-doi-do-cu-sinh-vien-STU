@@ -64,6 +64,14 @@ export function StudentLayout({ children }) {
         </span>
       </div>
 
+      {/* Locked Account Warning Banner */}
+      {(user?.status === 'LOCKED' || user?.status === 'BANNED' || user?.accountStatus === 'LOCKED') && (
+        <div className="bg-rose-600 text-white text-xs sm:text-sm py-2 px-4 text-center font-bold flex items-center justify-center gap-2 shadow-md">
+          <ShieldAlert className="w-5 h-5 shrink-0 animate-pulse" />
+          <span>🚨 TÀI KHOẢN CỦA BẠN ĐÃ BỊ KHÓA: Bạn đang bị đình chỉ quyền đăng tin, nhắn tin và giao dịch do vi phạm quy chế STU. Vui lòng liên hệ Ban Quản trị STU.</span>
+        </div>
+      )}
+
       {/* Main Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200/80 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
