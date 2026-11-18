@@ -16,6 +16,7 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Sparkles,
   Info,
 } from 'lucide-react';
@@ -208,6 +209,17 @@ export function CreateListingPage() {
       const condVal = vals.itemCondition || 'LIKE_NEW';
       const percentVal = Number(vals.conditionPercent) || 95;
       const priceVal = activeTab === 'GIVEAWAY' || activeTab === 'EXCHANGE' ? 0 : Number(vals.price || 0);
+
+      // Warning confirmation if price is over 10,000,000 VND
+      if (priceVal > 10000000) {
+        const confirmHighPrice = window.confirm(
+          `⚠️ CẢNH BÁO GIÁ TRỊ CAO:\n\nBạn đang đặt giá mong muốn là ${formatVND(priceVal)} (vượt quá 10.000.000 VNĐ).\n\nVui lòng xác nhận bạn không nhập thừa số 0. Bạn có chắc chắn muốn đăng món đồ này với mức giá trên không?`
+        );
+        if (!confirmHighPrice) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       // 3. Map form data to Backend CreateListingRequest DTO
       const payload = {
@@ -481,9 +493,17 @@ export function CreateListingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Giá mong muốn (VNĐ) <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Giá mong muốn (VNĐ) <span className="text-red-500">*</span>
+                  </label>
+                  {Number(watchedPrice) > 10000000 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 animate-pulse">
+                      <AlertTriangle className="w-3 h-3 text-amber-600" />
+                      Giá trị cao (&gt; 10 triệu)
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     type="number"
@@ -492,15 +512,50 @@ export function CreateListingPage() {
                     disabled={activeTab === 'GIVEAWAY' || activeTab === 'EXCHANGE'}
                     placeholder="VD: 150000"
                     {...register('price')}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-stu-orange focus:outline-none focus:border-stu-blue focus:ring-2 focus:ring-stu-blue/20 disabled:bg-slate-100 disabled:text-slate-400 transition"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-bold transition focus:outline-none focus:ring-2 disabled:bg-slate-100 disabled:text-slate-400 ${
+                      Number(watchedPrice) > 10000000
+                        ? 'border-amber-400 bg-amber-50/40 text-amber-800 focus:border-amber-500 focus:ring-amber-500/20'
+                        : 'border-slate-300 text-stu-orange focus:border-stu-blue focus:ring-stu-blue/20'
+                    }`}
                   />
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                     đ
                   </span>
                 </div>
-                <div className="text-xs font-semibold text-slate-500 mt-1">
-                  Xem trước: <span className="text-stu-orange font-bold">{formatVND(watchedPrice || 0)}</span>
+                <div className="text-xs font-semibold text-slate-500 mt-1 flex items-center justify-between">
+                  <span>
+                    Xem trước: <span className="text-stu-orange font-bold">{formatVND(watchedPrice || 0)}</span>
+                  </span>
                 </div>
+
+                {/* Cảnh báo khi giá mong muốn vượt quá 10 triệu đồng */}
+                {Number(watchedPrice) > 10000000 && (
+                  <div className="mt-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start gap-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-amber-900 text-xs">
+                          Cảnh báo mức giá cao: {formatVND(watchedPrice)}
+                        </p>
+                        <span className="bg-amber-200 text-amber-900 text-[10px] px-2 py-0.5 rounded-md font-black">
+                          &gt; 10.000.000đ
+                        </span>
+                      </div>
+                      <p className="text-amber-800 leading-relaxed text-[12px]">
+                        Bạn đang đặt giá mong muốn lớn hơn <strong>10.000.000 VNĐ (10 triệu đồng)</strong>. Vui lòng kiểm tra kỹ số tiền để chắc chắn không nhập thừa số 0.
+                      </p>
+                      <div className="text-[11px] text-amber-800 bg-amber-100/80 p-2.5 rounded-lg border border-amber-200/90 mt-1.5 space-y-0.5">
+                        <p className="font-bold text-amber-900 flex items-center gap-1">
+                          <span>🛡️ Khuyến nghị an toàn giao dịch tại trường STU:</span>
+                        </p>
+                        <p>
+                          Đối với đồ dùng học tập giá trị cao (Laptop, xe máy, máy tính bảng...), sinh viên nên hẹn gặp trực tiếp ban ngày tại khu vực an toàn có camera an ninh như <strong>Sảnh A (Tòa nhà Trung tâm)</strong> hoặc <strong>Thư viện trường STU (180 Cao Lỗ)</strong> và kiểm tra kỹ món đồ trước khi thanh toán.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {errors.price && (
                   <p className="text-xs text-red-500 mt-1">{errors.price.message}</p>
                 )}

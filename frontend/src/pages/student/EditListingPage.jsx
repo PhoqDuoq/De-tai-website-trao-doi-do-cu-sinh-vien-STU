@@ -8,7 +8,8 @@ import {
   Layers,
   Save,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useToast } from '@/hooks/useToast';
@@ -79,6 +80,14 @@ export function EditListingPage() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!selectedId) return;
+
+    if (Number(form.price) > 10000000) {
+      const confirmed = window.confirm(
+        `⚠️ CẢNH BÁO GIÁ TRỊ CAO:\n\nBạn đang đặt giá bán là ${formatVND(Number(form.price))} (trên 10 triệu đồng).\n\nVui lòng kiểm tra lại để chắc chắn không nhập thừa số 0. Bạn có muốn tiếp tục lưu giá này không?`
+      );
+      if (!confirmed) return;
+    }
+
     setIsSaving(true);
     try {
       await apiClient.put(`/api/v1/listings/${selectedId}`, {
@@ -174,16 +183,34 @@ export function EditListingPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Giá bán cập nhật (VNĐ) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Giá bán cập nhật (VNĐ) *
+                  </label>
+                  {Number(form.price) > 10000000 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                      <AlertTriangle className="w-3 h-3 text-amber-600" />
+                      &gt; 10 triệu
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-black text-stu-orange focus:outline-none focus:border-stu-blue"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-black focus:outline-none ${
+                    Number(form.price) > 10000000
+                      ? 'border-amber-400 bg-amber-50/40 text-amber-900 focus:border-amber-500'
+                      : 'border-slate-200 text-stu-orange focus:border-stu-blue'
+                  }`}
                   required
                 />
+                {Number(form.price) > 10000000 && (
+                  <p className="text-[11px] text-amber-700 font-semibold mt-1.5 flex items-center gap-1 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Giá trên 10 triệu ({formatVND(Number(form.price))}). Vui lòng kiểm tra kỹ tránh nhập thừa số 0.</span>
+                  </p>
+                )}
               </div>
 
               <div>
