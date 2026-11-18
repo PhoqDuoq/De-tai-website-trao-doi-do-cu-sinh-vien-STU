@@ -441,7 +441,9 @@ app.get('/api/v1/categories', async (req, res) => {
 // Get Public Listings (Search, filter, paging)
 app.get('/api/v1/listings', async (req, res) => {
   try {
-    const { keyword, categoryId, page = 0, size = 20 } = req.query;
+    const { keyword, search, q, categoryId, page = 0, size = 50 } = req.query;
+    const searchTerm = (keyword || search || q || '').trim();
+
     let query = `
       SELECT l.id, l.title, l.description, l.price, l.item_condition as itemCondition, 
              l.status, l.location_notes as locationNotes, l.created_at as createdAt,
@@ -454,9 +456,9 @@ app.get('/api/v1/listings', async (req, res) => {
     `;
     const params = [];
 
-    if (keyword) {
-      query += ' AND (l.title LIKE ? OR l.description LIKE ?)';
-      params.push(`%${keyword}%`, `%${keyword}%`);
+    if (searchTerm) {
+      query += ' AND (l.title LIKE ? OR l.description LIKE ? OR c.name LIKE ? OR l.location_notes LIKE ?)';
+      params.push(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`);
     }
 
     if (categoryId) {

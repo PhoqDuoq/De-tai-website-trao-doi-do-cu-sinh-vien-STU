@@ -44,7 +44,9 @@ export function StudentLayout({ children }) {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/listings?search=${encodeURIComponent(searchQuery.trim())}`);
+      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate('/');
     }
   };
 
