@@ -31,6 +31,10 @@ import { ModeratorListingsPage } from '@/pages/moderator/ModeratorListingsPage';
 import { ModeratorReportsPage } from '@/pages/moderator/ModeratorReportsPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
+import { AdminCategoriesPage } from '@/pages/admin/AdminCategoriesPage';
+import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
+import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
+import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { UnauthorizedPage } from '@/pages/UnauthorizedPage';
 
@@ -228,42 +232,10 @@ export function AppRoutes() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsersPage />} />
-        <Route
-          path="categories"
-          element={
-            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">Quản lý danh mục hàng hóa</h3>
-              <p className="text-xs text-slate-500 mt-1">Cấu hình các ngành đào tạo STU và nhóm đồ dùng học tập.</p>
-            </div>
-          }
-        />
-        <Route
-          path="billing"
-          element={
-            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">Cấu hình gói phí niêm yết</h3>
-              <p className="text-xs text-slate-500 mt-1">Gói đẩy bài & duy trì nền tảng STU Marketplace.</p>
-            </div>
-          }
-        />
-        <Route
-          path="analytics"
-          element={
-            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">Thống kê & Báo cáo tổng thể</h3>
-              <p className="text-xs text-slate-500 mt-1">Biểu đồ tăng trưởng người dùng, tin đăng và doanh thu phí.</p>
-            </div>
-          }
-        />
-        <Route
-          path="logs"
-          element={
-            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">Nhật ký kiểm toán hệ thống</h3>
-              <p className="text-xs text-slate-500 mt-1">Toàn bộ audit logs các sự kiện quan trọng trong hệ thống.</p>
-            </div>
-          }
-        />
+        <Route path="categories" element={<AdminCategoriesPage />} />
+        <Route path="billing" element={<AdminBillingPage />} />
+        <Route path="analytics" element={<AdminAnalyticsPage />} />
+        <Route path="logs" element={<AdminAuditLogsPage />} />
       </Route>
 
       {/* 5. Common & Error Pages */}

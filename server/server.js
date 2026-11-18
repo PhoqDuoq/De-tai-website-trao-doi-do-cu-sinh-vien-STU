@@ -202,6 +202,51 @@ async function initDatabaseDefaults() {
       `);
     }
 
+    // 4. Ensure Audit Logs Table in stu_identity_db
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stu_identity_db.audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        actor_id INT NOT NULL,
+        actor_name VARCHAR(100) NOT NULL,
+        actor_role VARCHAR(50) NOT NULL,
+        action VARCHAR(100) NOT NULL,
+        target_type VARCHAR(50) NOT NULL,
+        target_id VARCHAR(100) NULL,
+        details TEXT NULL,
+        ip_address VARCHAR(50) DEFAULT '127.0.0.1',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    const [auditRows] = await pool.query('SELECT count(*) as count FROM stu_identity_db.audit_logs');
+    if (auditRows[0].count === 0) {
+      await pool.query(`
+        INSERT INTO stu_identity_db.audit_logs (actor_id, actor_name, actor_role, action, target_type, target_id, details, ip_address, created_at)
+        VALUES
+        (1, 'Quản Trị Viên STU', 'ADMIN', 'SYSTEM_INIT', 'SYSTEM', 'GATEWAY', 'Khởi tạo hệ thống Microservices & API Gateway trên cổng 8080', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 3 DAY)),
+        (2, 'Kiểm Duyệt Viên STU', 'MODERATOR', 'VERIFY_STUDENT', 'USER_VERIFICATION', '3', 'Phê duyệt thẻ sinh viên MSSV DH52201642 (Hà Thiên Phúc - Khoa CNTT)', '192.168.1.15', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+        (2, 'Kiểm Duyệt Viên STU', 'MODERATOR', 'APPROVE_LISTING', 'LISTING', '1', 'Duyệt bài đăng: Giáo trình Lập trình Web & Ứng dụng STU', '192.168.1.15', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+        (1, 'Quản Trị Viên STU', 'ADMIN', 'UPDATE_PACKAGE', 'BILLING', 'BOOST_7_DAYS', 'Cập nhật giá niêm yết gói Đẩy tin nổi bật 7 ngày thành 15.000 VNĐ', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+        (2, 'Kiểm Duyệt Viên STU', 'MODERATOR', 'VERIFY_STUDENT', 'USER_VERIFICATION', '4', 'Phê duyệt thẻ sinh viên MSSV DH52200413 (Dương Hoài Phong - Khoa Điện tử)', '192.168.1.20', DATE_SUB(NOW(), INTERVAL 18 HOUR)),
+        (1, 'Quản Trị Viên STU', 'ADMIN', 'LOCK_USER', 'USER', '5', 'Khóa tài khoản sinh viên vi phạm quy chế bán đồ cấm trong trường STU', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 4 HOUR)),
+        (1, 'Quản Trị Viên STU', 'ADMIN', 'ADD_CATEGORY', 'CATEGORY', '7', 'Bổ sung danh mục: Phương tiện đi lại (Xe máy/Xe đạp SV)', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 2 HOUR));
+      `);
+    }
+
+    // 5. Ensure diverse sample invoices in stu_billing_db.invoices
+    const [invCount] = await pool.query('SELECT count(*) as count FROM stu_billing_db.invoices');
+    if (invCount[0].count <= 1) {
+      await pool.query(`
+        INSERT INTO stu_billing_db.invoices (invoice_code, user_id, listing_id, package_id, amount, status, created_at, paid_at)
+        VALUES
+        ('INV-914205', 4, 2, 2, 10000, 'PAID', DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+        ('INV-439281', 3, 3, 3, 15000, 'PAID', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY)),
+        ('INV-192847', 4, 4, 2, 10000, 'PAID', DATE_SUB(NOW(), INTERVAL 12 HOUR), DATE_SUB(NOW(), INTERVAL 12 HOUR)),
+        ('INV-556712', 3, 1, 3, 15000, 'PAID', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+        ('INV-773129', 4, 2, 2, 10000, 'PENDING', NOW(), NULL);
+      `);
+    }
+
     console.log('✅ CSDL MySQL trên WampServer đã được khởi tạo và kiểm tra thành công!');
   } catch (err) {
     console.error('Lỗi khởi tạo CSDL:', err.message);
@@ -1076,6 +1121,19 @@ app.patch('/api/v1/moderation/listings/:id', authenticateToken, requireRole('MOD
   }
 });
 
+// Helper to record system and admin audit logs
+async function recordAuditLog({ actorId, actorName, actorRole, action, targetType, targetId, details, ip = '127.0.0.1' }) {
+  try {
+    await pool.query(
+      `INSERT INTO stu_identity_db.audit_logs (actor_id, actor_name, actor_role, action, target_type, target_id, details, ip_address)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [actorId, actorName, actorRole, action, targetType, targetId ? String(targetId) : null, details || '', ip]
+    );
+  } catch (err) {
+    console.warn('recordAuditLog warning:', err.message);
+  }
+}
+
 // ==========================================
 // 9. ADMIN ENDPOINTS (RBAC PROTECTED)
 // ==========================================
@@ -1117,6 +1175,16 @@ app.patch('/api/v1/admin/users/:id/status', authenticateToken, requireRole('ADMI
             [targetUserId]
           );
         } catch (e) {}
+
+        await recordAuditLog({
+          actorId: req.user.id,
+          actorName: req.user.fullName,
+          actorRole: req.user.role,
+          action: 'LOCK_USER',
+          targetType: 'USER',
+          targetId: targetUserId,
+          details: `Khóa tài khoản người dùng #${targetUserId} và tự động ẩn toàn bộ tin đăng đang hoạt động.`
+        });
       } else if (status === 'ACTIVE') {
         // Restore listings when unlocked
         await pool.query('UPDATE stu_listing_db.listings SET status = "ACTIVE" WHERE seller_id = ? AND status = "HIDDEN"', [targetUserId]);
@@ -1128,11 +1196,30 @@ app.patch('/api/v1/admin/users/:id/status', authenticateToken, requireRole('ADMI
             [targetUserId]
           );
         } catch (e) {}
+
+        await recordAuditLog({
+          actorId: req.user.id,
+          actorName: req.user.fullName,
+          actorRole: req.user.role,
+          action: 'UNLOCK_USER',
+          targetType: 'USER',
+          targetId: targetUserId,
+          details: `Mở khóa tài khoản người dùng #${targetUserId} và khôi phục các tin đăng đã ẩn.`
+        });
       }
     }
 
     if (role) {
       await pool.query('UPDATE stu_identity_db.users SET role = ? WHERE id = ?', [role, targetUserId]);
+      await recordAuditLog({
+        actorId: req.user.id,
+        actorName: req.user.fullName,
+        actorRole: req.user.role,
+        action: 'CHANGE_ROLE',
+        targetType: 'USER',
+        targetId: targetUserId,
+        details: `Cập nhật vai trò người dùng #${targetUserId} thành ${role}`
+      });
     }
 
     const message = status === 'LOCKED'
@@ -1145,7 +1232,339 @@ app.patch('/api/v1/admin/users/:id/status', authenticateToken, requireRole('ADMI
   }
 });
 
-// Get system analytics
+// ==========================================
+// ADMIN CATEGORIES MANAGEMENT
+// ==========================================
+
+// Get all categories with listing counts
+app.get('/api/v1/admin/categories', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [categories] = await pool.query(`
+      SELECT c.id, c.parent_id as parentId, c.name, c.slug, c.icon_url as iconUrl,
+             c.sort_order as sortOrder, c.is_active as isActive, c.created_at as createdAt,
+             COUNT(l.id) as listingCount
+      FROM stu_listing_db.categories c
+      LEFT JOIN stu_listing_db.listings l ON l.category_id = c.id
+      GROUP BY c.id, c.parent_id, c.name, c.slug, c.icon_url, c.sort_order, c.is_active, c.created_at
+      ORDER BY c.sort_order ASC, c.id ASC
+    `);
+    return success(res, categories);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Create category
+app.post('/api/v1/admin/categories', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { name, slug, sortOrder, isActive, iconUrl } = req.body;
+    if (!name || !name.trim()) return failure(res, 'Tên danh mục không được để trống');
+    const finalSlug = (slug && slug.trim()) || name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const finalSort = parseInt(sortOrder) || 10;
+    const finalActive = isActive !== undefined ? (isActive ? 1 : 0) : 1;
+
+    const [result] = await pool.query(
+      `INSERT INTO stu_listing_db.categories (name, slug, sort_order, is_active, icon_url)
+       VALUES (?, ?, ?, ?, ?)`,
+      [name.trim(), finalSlug, finalSort, finalActive, iconUrl || null]
+    );
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'ADD_CATEGORY',
+      targetType: 'CATEGORY',
+      targetId: result.insertId,
+      details: `Thêm danh mục hàng hóa mới: "${name.trim()}" (slug: ${finalSlug})`
+    });
+
+    return success(res, { id: result.insertId, name: name.trim(), slug: finalSlug, sortOrder: finalSort, isActive: finalActive }, 'Thêm danh mục mới thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Update category
+app.put('/api/v1/admin/categories/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const catId = req.params.id;
+    const { name, slug, sortOrder, isActive, iconUrl } = req.body;
+    if (!name || !name.trim()) return failure(res, 'Tên danh mục không được để trống');
+    const finalSlug = (slug && slug.trim()) || name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    await pool.query(
+      `UPDATE stu_listing_db.categories
+       SET name = ?, slug = ?, sort_order = ?, is_active = ?, icon_url = ?
+       WHERE id = ?`,
+      [name.trim(), finalSlug, parseInt(sortOrder) || 0, isActive ? 1 : 0, iconUrl || null, catId]
+    );
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'UPDATE_CATEGORY',
+      targetType: 'CATEGORY',
+      targetId: catId,
+      details: `Cập nhật thông tin danh mục #${catId} thành "${name.trim()}"`
+    });
+
+    return success(res, { id: catId, name: name.trim(), slug: finalSlug, sortOrder, isActive }, 'Cập nhật danh mục thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Toggle category active status
+app.patch('/api/v1/admin/categories/:id/status', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const catId = req.params.id;
+    const { isActive } = req.body;
+    await pool.query('UPDATE stu_listing_db.categories SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, catId]);
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'TOGGLE_CATEGORY_STATUS',
+      targetType: 'CATEGORY',
+      targetId: catId,
+      details: `${isActive ? 'Hiện' : 'Ẩn'} danh mục #${catId}`
+    });
+
+    return success(res, { id: catId, isActive: isActive ? 1 : 0 }, 'Cập nhật trạng thái danh mục thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Delete category
+app.delete('/api/v1/admin/categories/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const catId = req.params.id;
+    const [listings] = await pool.query('SELECT count(*) as count FROM stu_listing_db.listings WHERE category_id = ?', [catId]);
+    if (listings[0].count > 0) {
+      await pool.query('UPDATE stu_listing_db.categories SET is_active = 0 WHERE id = ?', [catId]);
+      return success(res, { id: catId, isActive: 0 }, `Danh mục hiện có ${listings[0].count} tin đăng. Hệ thống đã tự động chuyển sang trạng thái ẨN để bảo toàn dữ liệu sinh viên.`);
+    }
+
+    await pool.query('DELETE FROM stu_listing_db.categories WHERE id = ?', [catId]);
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'DELETE_CATEGORY',
+      targetType: 'CATEGORY',
+      targetId: catId,
+      details: `Xóa danh mục hàng hóa #${catId}`
+    });
+
+    return success(res, { id: catId }, 'Đã xóa danh mục thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// ==========================================
+// ADMIN BILLING & INVOICE MANAGEMENT
+// ==========================================
+
+// Get all packages with revenue and usage stats
+app.get('/api/v1/admin/billing/packages', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT p.id, p.package_code as packageCode, p.name, p.description,
+             p.price, p.duration_days as durationDays, p.is_active as isActive, p.created_at as createdAt,
+             (SELECT COUNT(*) FROM stu_billing_db.invoices i WHERE i.package_id = p.id AND i.status = 'PAID') as totalPurchases,
+             (SELECT COALESCE(SUM(i.amount), 0) FROM stu_billing_db.invoices i WHERE i.package_id = p.id AND i.status = 'PAID') as totalRevenue
+      FROM stu_billing_db.fee_packages p
+      ORDER BY p.price ASC
+    `);
+    return success(res, rows);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Create billing package
+app.post('/api/v1/admin/billing/packages', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { packageCode, name, description, price, durationDays, isActive } = req.body;
+    if (!name || !packageCode) return failure(res, 'Mã gói và tên gói là bắt buộc');
+
+    const [result] = await pool.query(
+      `INSERT INTO stu_billing_db.fee_packages (package_code, name, description, price, duration_days, is_active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [packageCode.trim().toUpperCase(), name.trim(), description || '', price || 0, parseInt(durationDays) || 7, isActive ? 1 : 0]
+    );
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'ADD_BILLING_PACKAGE',
+      targetType: 'BILLING',
+      targetId: result.insertId,
+      details: `Tạo gói phí niêm yết mới: "${name}" (${packageCode}) - ${price} VNĐ / ${durationDays} ngày`
+    });
+
+    return success(res, { id: result.insertId }, 'Thêm gói phí niêm yết thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Update billing package
+app.put('/api/v1/admin/billing/packages/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const pkgId = req.params.id;
+    const { name, description, price, durationDays, isActive } = req.body;
+
+    await pool.query(
+      `UPDATE stu_billing_db.fee_packages
+       SET name = ?, description = ?, price = ?, duration_days = ?, is_active = ?
+       WHERE id = ?`,
+      [name, description, price, parseInt(durationDays) || 7, isActive ? 1 : 0, pkgId]
+    );
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: 'UPDATE_BILLING_PACKAGE',
+      targetType: 'BILLING',
+      targetId: pkgId,
+      details: `Cập nhật cấu hình gói phí #${pkgId} (${name}) - ${price} VNĐ`
+    });
+
+    return success(res, { id: pkgId }, 'Cập nhật gói phí thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Get invoices history
+app.get('/api/v1/admin/billing/invoices', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT i.id, i.invoice_code as invoiceCode, i.user_id as userId,
+             u.full_name as userName, u.student_id as studentCode,
+             i.listing_id as listingId, l.title as listingTitle,
+             i.package_id as packageId, p.name as packageName, p.package_code as packageCode,
+             i.amount, i.status, i.created_at as createdAt, i.paid_at as paidAt
+      FROM stu_billing_db.invoices i
+      LEFT JOIN stu_identity_db.users u ON u.id = i.user_id
+      LEFT JOIN stu_listing_db.listings l ON l.id = i.listing_id
+      LEFT JOIN stu_billing_db.fee_packages p ON p.id = i.package_id
+      ORDER BY i.created_at DESC
+    `);
+    return success(res, rows);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// ==========================================
+// ADMIN DETAILED ANALYTICS & REPORTS
+// ==========================================
+
+app.get('/api/v1/admin/analytics/details', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    // 1. Overall KPIs
+    const [users] = await pool.query(`
+      SELECT 
+        COUNT(*) as totalUsers,
+        SUM(CASE WHEN role = 'STUDENT' THEN 1 ELSE 0 END) as studentCount,
+        SUM(CASE WHEN role = 'MODERATOR' THEN 1 ELSE 0 END) as modCount,
+        SUM(CASE WHEN role = 'ADMIN' THEN 1 ELSE 0 END) as adminCount,
+        SUM(CASE WHEN status = 'LOCKED' OR status = 'BANNED' THEN 1 ELSE 0 END) as lockedCount
+      FROM stu_identity_db.users
+    `);
+
+    const [verifs] = await pool.query(`
+      SELECT 
+        SUM(CASE WHEN status = 'VERIFIED' THEN 1 ELSE 0 END) as verifiedCount,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pendingCount,
+        SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejectedCount
+      FROM stu_identity_db.user_verifications
+    `);
+
+    const [listings] = await pool.query(`
+      SELECT 
+        COUNT(*) as totalListings,
+        SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as activeListings,
+        SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END) as soldListings,
+        SUM(CASE WHEN status = 'HIDDEN' THEN 1 ELSE 0 END) as hiddenListings,
+        SUM(CASE WHEN is_boosted = 1 THEN 1 ELSE 0 END) as boostedListings
+      FROM stu_listing_db.listings
+    `);
+
+    const [transactions] = await pool.query(`
+      SELECT 
+        COUNT(*) as totalTransactions,
+        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completedTransactions,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pendingTransactions,
+        SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelledTransactions
+      FROM stu_transaction_db.transactions
+    `);
+
+    const [billing] = await pool.query(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0) as totalRevenue,
+        COUNT(*) as totalInvoices,
+        SUM(CASE WHEN status = 'PAID' THEN 1 ELSE 0 END) as paidInvoices
+      FROM stu_billing_db.invoices
+    `);
+
+    // 2. Category distribution
+    const [categories] = await pool.query(`
+      SELECT c.id, c.name, COUNT(l.id) as listingCount
+      FROM stu_listing_db.categories c
+      LEFT JOIN stu_listing_db.listings l ON l.category_id = c.id
+      GROUP BY c.id, c.name
+      ORDER BY listingCount DESC
+    `);
+
+    // 3. Campus meetup locations distribution
+    const [locations] = await pool.query(`
+      SELECT COALESCE(location_notes, 'Khuôn viên trường STU (180 Cao Lỗ)') as location, COUNT(*) as count
+      FROM stu_listing_db.listings
+      WHERE location_notes IS NOT NULL AND location_notes != ''
+      GROUP BY location_notes
+      ORDER BY count DESC
+      LIMIT 6
+    `);
+
+    // 4. Top active sellers
+    const [topSellers] = await pool.query(`
+      SELECT u.id, u.full_name as fullName, u.student_id as studentCode, COUNT(l.id) as listingCount
+      FROM stu_identity_db.users u
+      JOIN stu_listing_db.listings l ON l.seller_id = u.id
+      GROUP BY u.id, u.full_name, u.student_id
+      ORDER BY listingCount DESC
+      LIMIT 5
+    `);
+
+    return success(res, {
+      kpis: {
+        users: users[0] || {},
+        verifications: verifs[0] || { verifiedCount: 0, pendingCount: 0, rejectedCount: 0 },
+        listings: listings[0] || {},
+        transactions: transactions[0] || { totalTransactions: 0, completedTransactions: 0 },
+        billing: billing[0] || { totalRevenue: 0, paidInvoices: 0 },
+      },
+      categories,
+      locations,
+      topSellers,
+    });
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Basic system analytics for dashboard
 app.get('/api/v1/admin/analytics', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const [uCount] = await pool.query('SELECT count(*) as totalUsers FROM stu_identity_db.users');
@@ -1158,6 +1577,26 @@ app.get('/api/v1/admin/analytics', authenticateToken, requireRole('ADMIN'), asyn
       totalTransactions: tCount[0].totalTransactions,
       totalRevenue: bSum[0].totalRevenue,
     });
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// ==========================================
+// ADMIN AUDIT LOGS ENDPOINT
+// ==========================================
+
+app.get('/api/v1/admin/logs', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [logs] = await pool.query(`
+      SELECT id, actor_id as actorId, actor_name as actorName, actor_role as actorRole,
+             action, target_type as targetType, target_id as targetId,
+             details, ip_address as ipAddress, created_at as createdAt
+      FROM stu_identity_db.audit_logs
+      ORDER BY id DESC
+      LIMIT 200
+    `);
+    return success(res, logs);
   } catch (err) {
     return failure(res, err.message, 500);
   }
