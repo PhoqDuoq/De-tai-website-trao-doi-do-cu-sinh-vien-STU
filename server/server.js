@@ -185,7 +185,7 @@ app.post('/api/v1/auth/register', async (req, res) => {
       return failure(res, 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu');
     }
 
-    // Check existing email
+    // Check existing email or studentCode
     const [existing] = await pool.query(
       'SELECT id FROM stu_identity_db.users WHERE email = ? OR (student_id = ? AND student_id IS NOT NULL)',
       [email, studentCode || null]
@@ -202,9 +202,50 @@ app.post('/api/v1/auth/register', async (req, res) => {
       [studentCode || null, email, passwordHash, fullName, phone || null]
     );
 
+    const newUserId = result.insertId;
+
+    // Create a pending verification entry for this new student
+    try {
+      await pool.query(
+        `INSERT INTO stu_identity_db.user_verifications (user_id, student_card_image_url, status)
+         VALUES (?, NULL, 'PENDING')`,
+        [newUserId]
+      );
+    } catch (e) {
+      // ignore if duplicate or schema diff
+    }
+
+    // Welcome notification in Notification Center
+    try {
+      await pool.query(
+        `INSERT INTO stu_interaction_db.notifications (user_id, title, content, type, link_url)
+         VALUES (?, 'Chào mừng gia nhập STU Marketplace!', 'Tài khoản sinh viên STU của bạn đã được khởi tạo thành công. Vui lòng xác minh thẻ sinh viên để bắt đầu trao đổi an toàn.', 'SYSTEM', '/verify-student')`,
+        [newUserId]
+      );
+    } catch (e) {
+      // ignore
+    }
+
+    const tokenPayload = {
+      id: newUserId,
+      email,
+      fullName,
+      studentCode: studentCode || null,
+      roles: ['STUDENT'],
+      status: 'ACTIVE',
+      verificationStatus: 'PENDING',
+    };
+
+    const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+    const refreshToken = jwt.sign({ id: newUserId }, JWT_SECRET, { expiresIn: '30d' });
+
     return success(
       res,
-      { id: result.insertId, email, fullName, studentCode },
+      {
+        accessToken,
+        refreshToken,
+        user: tokenPayload,
+      },
       'Đăng ký tài khoản sinh viên STU thành công!',
       201
     );
