@@ -28,9 +28,16 @@ import { formatDate } from '@/lib/utils';
 const verifySchema = z.object({
   studentCode: z
     .string()
-    .min(5, 'Mã số sinh viên tối thiểu 5 ký tự')
-    .max(20, 'Mã số sinh viên tối đa 20 ký tự')
-    .regex(/^[A-Za-z0-9]+$/, 'Mã số sinh viên chỉ chứa chữ và số (VD: DH52001234)'),
+    .min(1, 'Vui lòng nhập Mã số sinh viên')
+    .refine(
+      (val) => {
+        const upper = (val || '').trim().toUpperCase();
+        return /^DH[0-9]{8}$/i.test(upper) || /^[A-Za-z0-9]{8,12}$/.test(upper);
+      },
+      {
+        message: 'Mã số sinh viên không hợp lệ (MSSV trường STU gồm đúng 10 ký tự, Ví dụ: DH52201642)',
+      }
+    ),
   method: z.enum(['MANUAL_REVIEW', 'INSTITUTION_API']),
   evidenceReference: z
     .string()
@@ -56,6 +63,8 @@ export function VerifyStudentPage() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(verifySchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       studentCode: user?.studentCode || '',
       method: 'MANUAL_REVIEW',

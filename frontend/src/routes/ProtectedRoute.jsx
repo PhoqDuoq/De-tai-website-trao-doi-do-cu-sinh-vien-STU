@@ -25,11 +25,21 @@ export function ProtectedRoute({
   }
 
   // Check account lock/suspension status
-  if (user.accountStatus === 'LOCKED' || user.accountStatus === 'SUSPENDED') {
+  const isLocked =
+    user.status === 'LOCKED' ||
+    user.status === 'BANNED' ||
+    user.status === 'SUSPENDED' ||
+    user.accountStatus === 'LOCKED' ||
+    user.accountStatus === 'SUSPENDED';
+
+  if (isLocked) {
     return (
       <Navigate
         to="/unauthorized"
-        state={{ reason: 'Tài khoản STU của bạn đã bị tạm khóa hoặc đình chỉ hoạt động.' }}
+        state={{
+          reason:
+            'Tài khoản STU của bạn đã bị KHÓA do vi phạm quy chế sàn. Mọi thao tác đăng bài, nhắn tin và giao dịch đã bị đình chỉ.',
+        }}
         replace
       />
     );
