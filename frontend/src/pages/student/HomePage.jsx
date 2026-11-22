@@ -49,11 +49,12 @@ export function HomePage() {
         if (urlSearch) params.search = urlSearch;
         if (selectedCategoryId) params.categoryId = selectedCategoryId;
         const res = await listingApi.getListings(params);
-        if (res && res.data && res.data.content && res.data.content.length > 0) {
+        if (res && res.data && res.data.content) {
           setLiveListings(res.data.content);
         }
       } catch (err) {
-        console.warn('Could not load live listings, using fallback showcase:', err.message);
+        console.warn('Could not load live listings:', err.message);
+        setLiveListings([]);
       } finally {
         setIsLoading(false);
       }
@@ -117,54 +118,6 @@ export function HomePage() {
       icon: <Bike className="w-6 h-6 text-cyan-600" />,
       color: 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200',
       description: 'Xe đạp, mũ bảo hiểm, phụ kiện xe máy',
-    },
-  ];
-
-  // Placeholder listing showcase to illustrate active marketplace UI
-  const sampleListings = [
-    {
-      id: 101,
-      title: 'Giáo trình Cấu trúc Dữ liệu & Giải thuật STU',
-      category: 'Giáo trình & Sách',
-      price: 45000,
-      condition: 'Mới 90%',
-      seller: 'Nguyễn Văn An (K20)',
-      isVerified: true,
-      location: 'Sảnh A - STU',
-      time: '30 phút trước',
-    },
-    {
-      id: 102,
-      title: 'Máy tính Casio fx-580VN X chính hãng còn bảo hành',
-      category: 'Dụng cụ học tập',
-      price: 380000,
-      condition: 'Mới 98%',
-      seller: 'Trần Thị Mai (K21)',
-      isVerified: true,
-      location: 'Căn tin STU',
-      time: '2 giờ trước',
-    },
-    {
-      id: 103,
-      title: 'Laptop Dell Latitude 5490 i5 8GB 256GB SSD',
-      category: 'Laptop & Máy tính',
-      price: 4200000,
-      condition: 'Đã qua sử dụng',
-      seller: 'Lê Hoàng Nam (K19)',
-      isVerified: true,
-      location: 'Thư viện STU lầu 2',
-      time: '4 giờ trước',
-    },
-    {
-      id: 104,
-      title: 'Bộ kit Arduino Uno R3 + Cảm biến thực hành vi điều khiển',
-      category: 'Thiết bị thí nghiệm',
-      price: 150000,
-      condition: 'Mới 95%',
-      seller: 'Phạm Minh Đức (K21)',
-      isVerified: true,
-      location: 'Xưởng thực hành STU',
-      time: 'Hôm qua',
     },
   ];
 
@@ -313,7 +266,7 @@ export function HomePage() {
               <p className="text-xs text-slate-500 mt-0.5">
                 {searchQuery
                   ? `Tìm thấy ${
-                      (liveListings.length > 0 ? liveListings : sampleListings).filter((item) => {
+                      liveListings.filter((item) => {
                         const isUnavailable =
                           item.status === 'SOLD' ||
                           item.status === 'TRADING' ||
@@ -362,7 +315,7 @@ export function HomePage() {
           </div>
 
           {(() => {
-            const displayListings = (liveListings.length > 0 ? liveListings : sampleListings).filter((item) => {
+            const displayListings = liveListings.filter((item) => {
               // Ẩn sản phẩm đã bán hoặc đang trong trạng thái giao dịch
               const isUnavailable =
                 item.status === 'SOLD' ||
@@ -395,21 +348,37 @@ export function HomePage() {
                     <Search className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-800">Không tìm thấy món đồ nào phù hợp</h3>
+                    <h3 className="text-base font-bold text-slate-800">
+                      {searchQuery
+                        ? 'Không tìm thấy món đồ nào phù hợp'
+                        : selectedCategoryId
+                        ? 'Chưa có tin đăng trong danh mục này'
+                        : 'Chưa có bài đăng nào đang mở bán'}
+                    </h3>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Không có tin đăng nào khớp với từ khóa "{searchQuery}". Bạn hãy thử tìm với các từ khóa phổ biến: giáo trình, casio, arduino, laptop, thước vẽ...
+                      {searchQuery
+                        ? `Không có tin đăng nào khớp với từ khóa "${searchQuery}". Bạn hãy thử tìm với các từ khóa phổ biến: giáo trình, casio, arduino, laptop...`
+                        : 'Hãy là sinh viên STU đầu tiên đăng bán giáo trình, dụng cụ học tập để chia sẻ với các bạn cùng trường!'}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCategoryId(null);
-                      handleClearSearch();
-                    }}
-                  >
-                    Xem tất cả đồ dùng STU
-                  </Button>
+                  {searchQuery || selectedCategoryId ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCategoryId(null);
+                        handleClearSearch();
+                      }}
+                    >
+                      Xem tất cả đồ dùng STU
+                    </Button>
+                  ) : (
+                    <Link to="/listings/create">
+                      <Button variant="primary" size="sm" leftIcon={<PlusCircle className="w-4 h-4" />}>
+                        Đăng bài bán đồ ngay
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               );
             }
