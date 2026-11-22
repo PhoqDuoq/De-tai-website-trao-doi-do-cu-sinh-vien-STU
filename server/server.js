@@ -274,24 +274,54 @@ app.post('/api/v1/auth/register', async (req, res) => {
     const { email, password, fullName, studentCode, phone } = req.body;
 
     if (!email || !password || !fullName) {
-      return failure(res, 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu');
+      return failure(res, 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu', 400);
+    }
+
+    const trimmedEmail = (email || '').trim().toLowerCase();
+
+    // RÀNG BUỘC EMAIL SINH VIÊN CHÍNH THỐNG:
+    // Bắt buộc email đăng ký phải có đuôi trường (@student.stu.edu.vn hoặc @stu.edu.vn)
+    // Chặn hoàn toàn các email cá nhân bên ngoài (@gmail.com, @yahoo.com,...)
+    const isStuEmail = /^[\w.-]+@(student\.stu\.edu\.vn|stu\.edu\.vn)$/i.test(trimmedEmail);
+    if (!isStuEmail) {
+      return failure(
+        res,
+        'Email không hợp lệ! Bắt buộc phải sử dụng email sinh viên trường STU (@student.stu.edu.vn hoặc @stu.edu.vn). Hệ thống chặn mọi email cá nhân bên ngoài.',
+        400
+      );
+    }
+
+    // RÀNG BUỘC MÃ SỐ SINH VIÊN (MSSV):
+    let finalStudentCode = null;
+    if (studentCode && studentCode.trim()) {
+      finalStudentCode = studentCode.trim().toUpperCase();
+      if (!/^DH[0-9]{8}$/i.test(finalStudentCode) && !/^[A-Z0-9]{8,12}$/i.test(finalStudentCode)) {
+        return failure(
+          res,
+          'Mã số sinh viên không hợp lệ! MSSV trường STU gồm đúng 10 ký tự (Ví dụ: DH52201642 hoặc DH52001234).',
+          400
+        );
+      }
     }
 
     // Check existing email or studentCode
     const [existing] = await pool.query(
-      'SELECT id FROM stu_identity_db.users WHERE email = ? OR (student_id = ? AND student_id IS NOT NULL)',
-      [email, studentCode || null]
+      'SELECT id, email, student_id FROM stu_identity_db.users WHERE email = ? OR (student_id = ? AND student_id IS NOT NULL)',
+      [trimmedEmail, finalStudentCode || null]
     );
 
     if (existing.length > 0) {
-      return failure(res, 'Email hoặc Mã số sinh viên đã tồn tại trên hệ thống STU');
+      if (existing[0].email === trimmedEmail) {
+        return failure(res, 'Email sinh viên này đã được đăng ký tài khoản trên hệ thống STU', 400);
+      }
+      return failure(res, 'Mã số sinh viên này đã được đăng ký tài khoản trên hệ thống STU', 400);
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
       `INSERT INTO stu_identity_db.users (student_id, email, password_hash, full_name, phone_number, role, status)
        VALUES (?, ?, ?, ?, ?, 'STUDENT', 'ACTIVE')`,
-      [studentCode || null, email, passwordHash, fullName, phone || null]
+      [finalStudentCode || null, trimmedEmail, passwordHash, fullName.trim(), phone ? phone.trim() : null]
     );
 
     const newUserId = result.insertId;
@@ -453,6 +483,14 @@ app.post('/api/v1/students/verify', authenticateToken, async (req, res) => {
   try {
     const { studentCode, evidenceReference } = req.body;
     const cardImage = evidenceReference || 'https://stu.edu.vn/card-demo.jpg';
+
+    if (studentCode) {
+      const code = studentCode.trim().toUpperCase();
+      if (!/^DH[0-9]{8}$/i.test(code) && !/^[A-Z0-9]{8,12}$/i.test(code)) {
+        return failure(res, 'Mã số sinh viên không hợp lệ! MSSV trường STU gồm 10 ký tự (Ví dụ: DH52201642)', 400);
+      }
+      await pool.query('UPDATE stu_identity_db.users SET student_id = ? WHERE id = ?', [code, req.user.id]);
+    }
 
     const [result] = await pool.query(
       `INSERT INTO stu_identity_db.user_verifications (user_id, student_card_image_url, status)

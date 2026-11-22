@@ -13,8 +13,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 const forgotPasswordSchema = z.object({
   email: z
     .string()
-    .min(1, 'Vui lòng nhập địa chỉ email')
-    .email('Email không đúng định dạng'),
+    .min(1, 'Vui lòng nhập địa chỉ email sinh viên STU')
+    .email('Email không đúng định dạng')
+    .refine(
+      (val) => {
+        const lower = (val || '').trim().toLowerCase();
+        return lower.endsWith('@student.stu.edu.vn') || lower.endsWith('@stu.edu.vn');
+      },
+      'Bắt buộc phải là email sinh viên trường STU (@student.stu.edu.vn hoặc @stu.edu.vn)'
+    ),
 });
 
 export function ForgotPasswordPage() {
@@ -29,6 +36,8 @@ export function ForgotPasswordPage() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(forgotPasswordSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: { email: '' },
   });
 

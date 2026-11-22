@@ -17,25 +17,36 @@ const registerSchema = z
       .string()
       .min(2, 'Họ và tên tối thiểu 2 ký tự')
       .max(150, 'Họ và tên tối đa 150 ký tự'),
-    email: z
-      .string()
-      .min(1, 'Vui lòng nhập email trường STU')
-      .email('Email không đúng định dạng')
-      .refine(
-        (val) => val.endsWith('@stu.edu.vn') || val.includes('@'),
-        'Khuyến khích sử dụng email sinh viên đuôi @stu.edu.vn'
-      ),
     studentCode: z
       .string()
-      .optional()
-      .refine((val) => !val || /^[A-Za-z0-9]{5,20}$/.test(val), {
-        message: 'Mã số sinh viên phải từ 5-20 ký tự chữ và số (VD: DH52001234)',
-      }),
+      .min(1, 'Vui lòng nhập Mã số sinh viên (MSSV)')
+      .refine(
+        (val) => {
+          const upper = (val || '').trim().toUpperCase();
+          return /^DH[0-9]{8}$/i.test(upper) || /^[A-Za-z0-9]{8,12}$/.test(upper);
+        },
+        {
+          message: 'Mã số sinh viên không hợp lệ (MSSV trường STU gồm đúng 10 ký tự, Ví dụ: DH52201642)',
+        }
+      ),
+    email: z
+      .string()
+      .min(1, 'Vui lòng nhập email sinh viên STU')
+      .email('Email không đúng định dạng')
+      .refine(
+        (val) => {
+          const lower = (val || '').trim().toLowerCase();
+          return lower.endsWith('@student.stu.edu.vn') || lower.endsWith('@stu.edu.vn');
+        },
+        {
+          message: 'Bắt buộc sử dụng email sinh viên chính thống của trường (@student.stu.edu.vn hoặc @stu.edu.vn). Chặn email cá nhân bên ngoài.',
+        }
+      ),
     phone: z
       .string()
-      .optional()
-      .refine((val) => !val || /^(0|\+84)[0-9]{9,10}$/.test(val), {
-        message: 'Số điện thoại phải gồm 10 chữ số hợp lệ (VD: 0901234567)',
+      .min(1, 'Vui lòng nhập số điện thoại liên hệ')
+      .refine((val) => /^(0|\+84)[0-9]{9}$/.test((val || '').replace(/\s+/g, '')), {
+        message: 'Số điện thoại phải gồm 10 chữ số hợp lệ (Ví dụ: 0901234567)',
       }),
     password: z
       .string()
@@ -60,9 +71,13 @@ export function RegisterPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(registerSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       fullName: '',
       email: '',
@@ -137,30 +152,42 @@ export function RegisterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <Input
                 label="Mã số sinh viên (MSSV)"
-                placeholder="VD: DH52001234"
+                placeholder="VD: DH52201642"
+                required
                 leftIcon={<GraduationCap className="w-4 h-4" />}
-                helperText="Dùng để đối chiếu thẻ SV"
+                helperText="MSSV trường STU gồm 10 ký tự (báo lỗi ngay khi rời ô)"
                 error={errors.studentCode?.message}
-                {...register('studentCode')}
+                {...register('studentCode', {
+                  onBlur: (e) => {
+                    const code = (e.target.value || '').trim();
+                    if (/^DH[0-9]{8}$/i.test(code)) {
+                      const currentEmail = getValues('email');
+                      if (!currentEmail) {
+                        setValue('email', `${code.toLowerCase()}@student.stu.edu.vn`, { shouldValidate: true });
+                      }
+                    }
+                  },
+                })}
               />
 
               <Input
                 label="Số điện thoại"
                 placeholder="VD: 0901234567"
+                required
                 leftIcon={<Phone className="w-4 h-4" />}
-                helperText="Hẹn giao dịch tại trường"
+                helperText="Hẹn gặp trao đổi tại STU"
                 error={errors.phone?.message}
                 {...register('phone')}
               />
             </div>
 
             <Input
-              label="Email STU"
+              label="Email Sinh Viên STU"
               type="email"
-              placeholder="VD: dh52001234@stu.edu.vn"
+              placeholder="VD: dh52201642@student.stu.edu.vn"
               required
               leftIcon={<Mail className="w-4 h-4" />}
-              helperText="Ưu tiên dùng email @stu.edu.vn để duyệt nhanh"
+              helperText="Bắt buộc sử dụng email @student.stu.edu.vn hoặc @stu.edu.vn (chặn email ngoài)"
               error={errors.email?.message}
               {...register('email')}
             />
