@@ -72,15 +72,16 @@ export function MyListingsPage() {
   const filteredListings = listings.filter((item) => {
     if (filter === 'ALL') return true;
     if (filter === 'ACTIVE') return item.status === 'ACTIVE' || item.status === 'PUBLISHED';
-    if (filter === 'PENDING') return item.status === 'PENDING' || item.status === 'DRAFT';
+    if (filter === 'PENDING') return item.status === 'PENDING' || item.status === 'DRAFT' || item.status === 'PENDING_APPROVAL';
     if (filter === 'SOLD') return item.status === 'SOLD';
+    if (filter === 'REJECTED') return item.status === 'REJECTED';
     return true;
   });
 
   const counts = {
     all: listings.length,
     active: listings.filter((l) => l.status === 'ACTIVE' || l.status === 'PUBLISHED').length,
-    pending: listings.filter((l) => l.status === 'PENDING' || l.status === 'DRAFT').length,
+    pending: listings.filter((l) => l.status === 'PENDING' || l.status === 'DRAFT' || l.status === 'PENDING_APPROVAL').length,
     sold: listings.filter((l) => l.status === 'SOLD').length,
   };
 
@@ -204,16 +205,28 @@ export function MyListingsPage() {
                         className={`px-3 py-1 rounded-full text-[11px] font-bold ${
                           item.status === 'SOLD'
                             ? 'bg-slate-100 text-slate-600'
+                            : item.status === 'TRADING' || item.status === 'IN_TRANSACTION'
+                            ? 'bg-blue-50 text-stu-blue border border-blue-200'
+                            : item.status === 'REJECTED'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : item.status === 'PENDING_APPROVAL'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
                             : item.status === 'ACTIVE' || item.status === 'PUBLISHED'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-50 text-slate-700 border border-slate-200'
                         }`}
                       >
                         {item.status === 'SOLD'
                           ? 'Đã hoàn tất giao dịch'
+                          : item.status === 'TRADING' || item.status === 'IN_TRANSACTION'
+                          ? 'Đang có giao dịch hẹn gặp'
+                          : item.status === 'REJECTED'
+                          ? 'Bị từ chối kiểm duyệt'
+                          : item.status === 'PENDING_APPROVAL'
+                          ? 'Đang chờ Admin STU kiểm duyệt'
                           : item.status === 'ACTIVE' || item.status === 'PUBLISHED'
                           ? 'Đang hiển thị trên sàn STU'
-                          : 'Bản nháp / Chờ duyệt'}
+                          : 'Bản nháp'}
                       </span>
                       <span className="text-xs text-slate-400">
                         Mã tin: #{item.id} • {item.created_at ? formatDate(item.created_at) : 'Hôm nay'}

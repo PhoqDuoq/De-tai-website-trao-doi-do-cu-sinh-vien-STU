@@ -31,6 +31,7 @@ import { ModeratorListingsPage } from '@/pages/moderator/ModeratorListingsPage';
 import { ModeratorReportsPage } from '@/pages/moderator/ModeratorReportsPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
+import { AdminListingsModerationPage } from '@/pages/admin/AdminListingsModerationPage';
 import { AdminCategoriesPage } from '@/pages/admin/AdminCategoriesPage';
 import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
@@ -232,6 +233,7 @@ export function AppRoutes() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="listings" element={<AdminListingsModerationPage />} />
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="billing" element={<AdminBillingPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />

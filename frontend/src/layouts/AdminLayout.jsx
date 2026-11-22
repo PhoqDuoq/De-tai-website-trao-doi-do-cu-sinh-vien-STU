@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Shield,
   FileText,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { RoleBadge } from '@/components/ui/Badge';
@@ -35,6 +36,11 @@ export function AdminLayout({ children }) {
       title: 'Quản lý người dùng',
       path: '/admin/users',
       icon: <Users className="w-4 h-4" />,
+    },
+    {
+      title: 'Kiểm duyệt tin đăng',
+      path: '/admin/listings',
+      icon: <ClipboardCheck className="w-4 h-4" />,
     },
     {
       title: 'Danh mục hàng hoá',

@@ -597,16 +597,46 @@ app.post('/api/v1/listings', authenticateToken, async (req, res) => {
     else if (itemCondition === 'LIKE_NEW') dbCondition = 'LIKE_NEW';
     else if (itemCondition === 'USED') dbCondition = 'USED_GOOD';
 
-    const status = submitForReview ? 'ACTIVE' : 'DRAFT'; // Set ACTIVE directly for instant smooth demo
+    const numPrice = Number(price) || 0;
+    // Luồng kiểm duyệt tin đăng STU:
+    // Mọi tin gửi duyệt sẽ chuyển sang PENDING_APPROVAL để Quản trị viên kiểm duyệt trước khi hiển thị công khai
+    const status = submitForReview ? 'PENDING_APPROVAL' : 'DRAFT';
 
     const [result] = await pool.query(
       `INSERT INTO stu_listing_db.listings 
        (seller_id, category_id, title, description, price, item_condition, status, location_notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'Khuôn viên trường Đại học Công Nghệ Sài Gòn (STU)')`,
-      [req.user.id, Number(categoryId), title, description, Number(price) || 0, dbCondition, status]
+      [req.user.id, Number(categoryId), title, description, numPrice, dbCondition, status]
     );
 
     const listingId = result.insertId;
+
+    // Cảnh báo kiểm toán nếu giá cao bất thường (>= 10.000.000 đ)
+    if (numPrice >= 10000000) {
+      await recordAuditLog({
+        actorId: req.user.id,
+        actorName: req.user.fullName,
+        actorRole: req.user.role,
+        action: 'ABNORMAL_PRICE_ALERT',
+        targetType: 'LISTING',
+        targetId: listingId,
+        details: `Cảnh báo tin đăng có mức giá bất thường (${numPrice.toLocaleString('vi-VN')} đ): "${title}" - cần Admin kiểm duyệt kỹ.`
+      });
+    }
+
+    // Thông báo cho Ban Quản trị (Admin) về tin đăng mới
+    try {
+      await pool.query(
+        `INSERT INTO stu_interaction_db.notifications (user_id, title, content, type)
+         VALUES (1, ?, ?, 'SYSTEM')`,
+        [
+          numPrice >= 10000000 ? '⚠️ Cảnh báo tin giá cao bất thường cần duyệt' : 'Tin đăng mới cần kiểm duyệt',
+          `Sinh viên ${req.user.fullName} vừa đăng tin #${listingId} "${title}" (${numPrice.toLocaleString('vi-VN')} đ) đang chờ kiểm duyệt.`
+        ]
+      );
+    } catch (notifErr) {
+      console.warn('Notification to admin warning:', notifErr.message);
+    }
 
     // Insert Images
     if (Array.isArray(images) && images.length > 0) {
@@ -1269,29 +1299,115 @@ app.patch('/api/v1/students/verifications/:id/review', authenticateToken, requir
   }
 });
 
-// Get moderation listings
-app.get('/api/v1/moderation/listings', authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
+// Get moderation & admin listings
+app.get(['/api/v1/moderation/listings', '/api/v1/admin/listings'], authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    const { status, abnormalOnly } = req.query;
+    let sql = `
       SELECT l.*, c.name as categoryName, u.full_name as sellerName, u.student_id as sellerStudentCode,
+             (CASE WHEN l.price >= 10000000 THEN 1 ELSE 0 END) as isAbnormalPrice,
              (SELECT image_url FROM stu_listing_db.listing_images WHERE listing_id = l.id LIMIT 1) as primaryImageUrl
       FROM stu_listing_db.listings l
       LEFT JOIN stu_listing_db.categories c ON l.category_id = c.id
       LEFT JOIN stu_identity_db.users u ON l.seller_id = u.id
-      ORDER BY l.id DESC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
+    if (status && status !== 'ALL') {
+      sql += ' AND l.status = ?';
+      params.push(status);
+    }
+    if (abnormalOnly === 'true' || abnormalOnly === '1') {
+      sql += ' AND l.price >= 10000000';
+    }
+    // Prioritize PENDING_APPROVAL and high price items on top
+    sql += ` ORDER BY 
+      CASE WHEN l.status = 'PENDING_APPROVAL' THEN 0 
+           WHEN l.status = 'DRAFT' THEN 1 
+           WHEN l.status = 'ACTIVE' THEN 2 
+           ELSE 3 END ASC,
+      CASE WHEN l.price >= 10000000 THEN 0 ELSE 1 END ASC,
+      l.id DESC`;
+
+    const [rows] = await pool.query(sql, params);
     return success(res, rows);
   } catch (err) {
     return failure(res, err.message, 500);
   }
 });
 
-// Update listing moderation status
-app.patch('/api/v1/moderation/listings/:id', authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
+// Update listing moderation status (Approve / Reject / Hide)
+app.patch(['/api/v1/moderation/listings/:id', '/api/v1/admin/listings/:id'], authenticateToken, requireRole('MODERATOR', 'ADMIN'), async (req, res) => {
   try {
-    const { status } = req.body;
-    await pool.query('UPDATE stu_listing_db.listings SET status = ? WHERE id = ?', [status, req.params.id]);
-    return success(res, { id: req.params.id, status }, 'Cập nhật trạng thái kiểm duyệt tin thành công!');
+    const { status, reason } = req.body;
+    const listingId = req.params.id;
+
+    const [listingRows] = await pool.query('SELECT seller_id, title, price FROM stu_listing_db.listings WHERE id = ?', [listingId]);
+    if (listingRows.length === 0) {
+      return failure(res, 'Không tìm thấy tin đăng', 404);
+    }
+    const listing = listingRows[0];
+
+    await pool.query('UPDATE stu_listing_db.listings SET status = ? WHERE id = ?', [status, listingId]);
+
+    // Record audit log
+    const actionName = status === 'ACTIVE' ? 'APPROVE_LISTING' : (status === 'REJECTED' ? 'REJECT_LISTING' : 'UPDATE_LISTING_STATUS');
+    const actionDesc = status === 'ACTIVE'
+      ? `Phê duyệt hiển thị tin đăng #${listingId}: "${listing.title}" (${Number(listing.price).toLocaleString('vi-VN')} đ)`
+      : status === 'REJECTED'
+      ? `Từ chối tin đăng #${listingId}: "${listing.title}"${reason ? ` - Lý do: ${reason}` : ''}`
+      : `Chuyển trạng thái tin đăng #${listingId} thành ${status}`;
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorName: req.user.fullName,
+      actorRole: req.user.role,
+      action: actionName,
+      targetType: 'LISTING',
+      targetId: listingId,
+      details: `${req.user.fullName} (${req.user.role}): ${actionDesc}`
+    });
+
+    // Send real-time notification to the seller
+    try {
+      const notifTitle = status === 'ACTIVE' 
+        ? 'Tin đăng của bạn đã được duyệt!' 
+        : status === 'REJECTED' 
+        ? 'Tin đăng bị từ chối kiểm duyệt' 
+        : 'Trạng thái tin đăng đã cập nhật';
+      const notifBody = status === 'ACTIVE'
+        ? `Tin đăng "${listing.title}" đã được Quản trị viên duyệt và đang hiển thị công khai trên sàn STU.`
+        : status === 'REJECTED'
+        ? `Tin đăng "${listing.title}" đã bị từ chối kiểm duyệt.${reason ? ` Lý do: ${reason}` : ''}`
+        : `Tin đăng "${listing.title}" vừa được cập nhật sang trạng thái ${status}.`;
+
+      await pool.query(
+        'INSERT INTO stu_interaction_db.notifications (user_id, title, content, type) VALUES (?, ?, ?, ?)',
+        [listing.seller_id, notifTitle, notifBody, status === 'REJECTED' ? 'WARNING' : 'SYSTEM']
+      );
+    } catch (notifErr) {
+      console.warn('Seller notification warning:', notifErr.message);
+    }
+
+    return success(res, { id: listingId, status }, 'Cập nhật trạng thái kiểm duyệt tin thành công!');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Reviews API: Get user reviews
+app.get('/api/v1/users/:id/reviews', async (req, res) => {
+  try {
+    const [reviews] = await pool.query(`
+      SELECT r.id, r.reviewer_id as reviewerId, r.reviewee_id as revieweeId,
+             r.transaction_id as transactionId, r.rating, r.comment, r.created_at as createdAt,
+             u.full_name as reviewerName, u.student_id as reviewerStudentCode
+      FROM stu_interaction_db.reviews r
+      JOIN stu_identity_db.users u ON u.id = r.reviewer_id
+      WHERE r.reviewee_id = ?
+      ORDER BY r.id DESC
+    `, [req.params.id]);
+    return success(res, reviews);
   } catch (err) {
     return failure(res, err.message, 500);
   }

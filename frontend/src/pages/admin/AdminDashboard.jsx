@@ -12,6 +12,8 @@ import {
   Settings,
   ArrowRight,
   ExternalLink,
+  ClipboardCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -152,10 +154,30 @@ export function AdminDashboard() {
       </Card>
 
       {/* Quick Action Management Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="hover:border-slate-300 transition-colors">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="hover:border-rose-300 transition-colors bg-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <ClipboardCheck className="w-4 h-4 text-rose-600" />
+              <span>Kiểm duyệt tin đăng</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Duyệt tin bài sinh viên & kiểm tra các tin có giá trị cao (&gt; 10 triệu VNĐ).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Link to="/admin/listings">
+              <Button variant="outline" size="sm" className="w-full justify-between cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300">
+                <span>Vào kiểm duyệt</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:border-slate-300 transition-colors bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Users className="w-4 h-4 text-stu-blue" />
               <span>Quản lý người dùng</span>
             </CardTitle>
@@ -164,46 +186,52 @@ export function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            <Button variant="outline" size="sm" className="w-full justify-between">
-              <span>Xem danh sách tài khoản</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
+            <Link to="/admin/users">
+              <Button variant="outline" size="sm" className="w-full justify-between cursor-pointer hover:bg-blue-50 hover:text-stu-blue">
+                <span>Xem người dùng</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
-        <Card className="hover:border-slate-300 transition-colors">
+        <Card className="hover:border-slate-300 transition-colors bg-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-emerald-600" />
-              <span>Gói phí niêm yết</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Quản lý gói phí đẩy bài (Billing Service). Cam kết không thu phí mua bán giữa SV.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <Button variant="outline" size="sm" className="w-full justify-between">
-              <span>Cấu hình bảng phí</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-slate-300 transition-colors">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Layers className="w-4 h-4 text-purple-600" />
               <span>Danh mục hàng hoá</span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Thêm mới hoặc cập nhật các ngành đào tạo STU (CNTT, Cơ khí, Điện tử, QTKD, Design).
+              Cập nhật các ngành đào tạo STU (Sách, Đồ án, CNTT, Casio, Xe máy SV).
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            <Button variant="outline" size="sm" className="w-full justify-between">
-              <span>Quản lý phân loại</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
+            <Link to="/admin/categories">
+              <Button variant="outline" size="sm" className="w-full justify-between cursor-pointer hover:bg-purple-50 hover:text-purple-700">
+                <span>Quản lý phân loại</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:border-slate-300 transition-colors bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <span>Gói phí niêm yết</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Cấu hình bảng phí đẩy bài & theo dõi doanh thu hóa đơn STU.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Link to="/admin/billing">
+              <Button variant="outline" size="sm" className="w-full justify-between cursor-pointer hover:bg-emerald-50 hover:text-emerald-700">
+                <span>Cấu hình gói phí</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

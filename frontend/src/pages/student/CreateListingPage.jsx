@@ -249,10 +249,14 @@ export function CreateListingPage() {
       const res = await listingApi.createListing(payload);
       console.log('Create listing response:', res);
 
-      toast.success('🎉 Đăng tin sản phẩm lên sàn STU thành công! Dữ liệu đã lưu vào MySQL.');
+      toast.success(
+        submitForReview
+          ? '🎉 Đăng tin thành công! Tin của bạn đã gửi đến Ban Quản trị STU và đang chờ kiểm duyệt.'
+          : 'Đã lưu bản nháp thành công!'
+      );
 
       setTimeout(() => {
-        navigate('/');
+        navigate('/my-listings');
       }, 700);
     } catch (err) {
       console.error('Submit error:', err);
@@ -671,49 +675,16 @@ export function CreateListingPage() {
             )}
           </div>
 
-          {/* SECTION 7: GÓI HIỂN THỊ */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              7. Gói hiển thị tin đăng
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-stu-blue transition">
-                <input
-                  type="radio"
-                  value="free"
-                  {...register('packageType')}
-                  defaultChecked
-                  className="accent-stu-blue"
-                />
-                <div>
-                  <div className="text-xs font-bold text-slate-800">
-                    Gói Sinh viên Tiêu chuẩn (0 đ)
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Hiển thị trên sàn STU không giới hạn thời gian
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50/40 cursor-pointer hover:border-amber-400 transition">
-                <input
-                  type="radio"
-                  value="featured"
-                  {...register('packageType')}
-                  className="accent-stu-orange"
-                />
-                <div>
-                  <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                    <span>Gói Đẩy Tin Nổi Bật (15.000 đ)</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-amber-200 text-amber-800 text-[9px] font-bold">
-                      HOT
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-amber-700">
-                    Ghim trên trang chủ STU Market trong 7 ngày
-                  </div>
-                </div>
-              </label>
+          {/* SECTION 7: CHÍNH SÁCH NIÊM YẾT */}
+          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-stu-blue flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Niêm yết tin đăng 100% miễn phí cho Sinh viên STU</h4>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Mọi tin đăng trao đổi giáo trình, đồ dùng học tập và thiết bị trong khuôn viên Đại học Công Nghệ Sài Gòn đều được hỗ trợ đăng tin hoàn toàn miễn phí. Tin đăng sẽ được Ban Quản Trị kiểm duyệt trước khi hiển thị công khai.
+              </p>
             </div>
           </div>
 
