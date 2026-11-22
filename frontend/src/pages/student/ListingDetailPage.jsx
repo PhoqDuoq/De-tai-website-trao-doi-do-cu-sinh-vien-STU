@@ -118,6 +118,23 @@ export function ListingDetailPage() {
     );
   }
 
+  // Parse meetup location and time from location_notes
+  const rawLoc = listing.location_notes || listing.locationNotes || 'Sảnh A - 180 Cao Lỗ, Phường 4, Quận 8';
+  let displayLoc = rawLoc;
+  let displayMeetupTime = 'Vui lòng liên hệ qua chức năng chat';
+
+  if (rawLoc.includes(' • ')) {
+    const parts = rawLoc.split(' • ');
+    displayLoc = parts[0];
+    displayMeetupTime = parts.slice(1).join(' • ');
+  } else if (rawLoc.includes('(Khung giờ:')) {
+    const m = rawLoc.match(/(.*?)\s*\(Khung giờ:\s*(.*?)\)/);
+    if (m) {
+      displayLoc = m[1];
+      displayMeetupTime = m[2];
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Back button */}
@@ -228,7 +245,7 @@ export function ListingDetailPage() {
                     Địa điểm hẹn gặp giao dịch an toàn tại STU:
                   </span>
                   <strong className="text-slate-900 font-bold text-sm block mt-0.5">
-                    {listing.location_notes || 'Sảnh A - 180 Cao Lỗ, Phường 4, Quận 8'}
+                    {displayLoc}
                   </strong>
                 </div>
               </div>
@@ -238,7 +255,8 @@ export function ListingDetailPage() {
                 <div className="flex items-center gap-2 text-xs text-slate-700">
                   <Clock className="w-4 h-4 text-stu-blue shrink-0" />
                   <span>
-                    <strong>Thời gian hẹn gặp:</strong> Vui lòng liên hệ qua chức năng chat
+                    <strong>Thời gian hẹn gặp:</strong>{' '}
+                    <span className="font-bold text-stu-blue">{displayMeetupTime}</span>
                   </span>
                 </div>
                 <Link
