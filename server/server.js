@@ -623,7 +623,18 @@ app.get('/api/v1/listings/:id', async (req, res) => {
 // Create New Listing
 app.post('/api/v1/listings', authenticateToken, async (req, res) => {
   try {
-    const { categoryId, title, description, price, itemCondition, submitForReview, images } = req.body;
+    const {
+      categoryId,
+      title,
+      description,
+      price,
+      itemCondition,
+      submitForReview,
+      images,
+      locationNotes,
+      campusLocation,
+      meetupTime,
+    } = req.body;
 
     if (!title || !description || categoryId === undefined) {
       return failure(res, 'Vui lòng cung cấp đầy đủ Tiêu đề, Danh mục và Mô tả sản phẩm');
@@ -640,11 +651,18 @@ app.post('/api/v1/listings', authenticateToken, async (req, res) => {
     // Mọi tin gửi duyệt sẽ chuyển sang PENDING_APPROVAL để Quản trị viên kiểm duyệt trước khi hiển thị công khai
     const status = submitForReview ? 'PENDING_APPROVAL' : 'DRAFT';
 
+    let finalLocationNotes = 'Khuôn viên trường Đại học Công Nghệ Sài Gòn (STU)';
+    if (locationNotes) {
+      finalLocationNotes = locationNotes;
+    } else if (campusLocation) {
+      finalLocationNotes = meetupTime ? `${campusLocation} • ${meetupTime}` : campusLocation;
+    }
+
     const [result] = await pool.query(
       `INSERT INTO stu_listing_db.listings 
        (seller_id, category_id, title, description, price, item_condition, status, location_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Khuôn viên trường Đại học Công Nghệ Sài Gòn (STU)')`,
-      [req.user.id, Number(categoryId), title, description, numPrice, dbCondition, status]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, Number(categoryId), title, description, numPrice, dbCondition, status, finalLocationNotes]
     );
 
     const listingId = result.insertId;

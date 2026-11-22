@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Sparkles,
   Info,
+  Clock,
 } from 'lucide-react';
 
 import { listingApi } from '@/api/listingApi';
@@ -43,6 +44,7 @@ const createListingSchema = z.object({
     .min(0, 'Giá không thể âm')
     .default(0),
   campusLocation: z.string().optional(),
+  meetupTime: z.string().optional().default('Thỏa thuận linh hoạt qua Chat'),
   description: z.string().optional().default(''),
   packageType: z.enum(['free', 'featured']).default('free'),
 });
@@ -65,6 +67,17 @@ const CAMPUS_LOCATIONS = [
   'Khu xưởng thực hành Cơ khí - Điện',
   'Sân bóng rổ / Sân thể thao STU',
   'Cổng chính 180 Cao Lỗ',
+];
+
+const CAMPUS_MEETUP_TIMES = [
+  'Thỏa thuận linh hoạt qua Chat',
+  'Các buổi sáng (07h00 - 11h30)',
+  'Các buổi chiều (13h00 - 17h00)',
+  'Giờ ra chơi giữa ca (09h15 hoặc 14h45)',
+  'Sau giờ học (từ 17h00 trở đi)',
+  'Các ngày thứ 2 - 4 - 6',
+  'Các ngày thứ 3 - 5 - 7',
+  'Cuối tuần (Thứ 7 - Chủ Nhật)',
 ];
 
 export function CreateListingPage() {
@@ -94,6 +107,7 @@ export function CreateListingPage() {
       conditionPercent: 95,
       price: 50000,
       campusLocation: CAMPUS_LOCATIONS[0],
+      meetupTime: CAMPUS_MEETUP_TIMES[0],
       description: '',
       packageType: 'free',
     },
@@ -206,6 +220,7 @@ export function CreateListingPage() {
       const titleVal = (vals.title || '').trim() || 'Đồ dùng học tập sinh viên STU';
       const descVal = (vals.description || 'Đồ dùng sinh viên trường STU còn hoạt động tốt').trim();
       const locVal = vals.campusLocation || 'Sảnh A - Tòa nhà Trung tâm STU';
+      const timeVal = vals.meetupTime || 'Thỏa thuận linh hoạt qua Chat';
       const condVal = vals.itemCondition || 'LIKE_NEW';
       const percentVal = Number(vals.conditionPercent) || 95;
       const priceVal = activeTab === 'GIVEAWAY' || activeTab === 'EXCHANGE' ? 0 : Number(vals.price || 0);
@@ -225,7 +240,10 @@ export function CreateListingPage() {
       const payload = {
         categoryId: catId,
         title: titleVal,
-        description: `${descVal}\n\n[Địa điểm hẹn gặp tại STU: ${locVal}]`,
+        description: `${descVal}\n\n[Địa điểm hẹn gặp tại STU: ${locVal} • Khung giờ: ${timeVal}]`,
+        campusLocation: locVal,
+        meetupTime: timeVal,
+        locationNotes: `${locVal} • ${timeVal}`,
         price: priceVal,
         itemCondition: condVal,
         conditionPercent: percentVal,
@@ -632,27 +650,59 @@ export function CreateListingPage() {
             </div>
           </div>
 
-          {/* SECTION 5: ĐỊA ĐIỂM GIAO DỊCH TẠI TRƯỜNG */}
+          {/* SECTION 5: ĐỊA ĐIỂM & THỜI GIAN HẸN GẶP TẠI TRƯỜNG */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              5. Địa điểm hẹn gặp giao dịch an toàn tại STU
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+              5. Địa điểm & Khung giờ hẹn gặp giao dịch an toàn tại STU
             </label>
-            <div className="relative">
-              <select
-                {...register('campusLocation')}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-stu-blue focus:ring-2 focus:ring-stu-blue/20 transition"
-              >
-                {CAMPUS_LOCATIONS.map((loc, idx) => (
-                  <option key={idx} value={loc}>
-                    {loc}
-                  </option>
-                ))}
-              </select>
-              <MapPin className="w-4 h-4 text-stu-blue absolute left-3.5 top-1/2 -translate-y-1/2" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 5.1 Địa điểm tại STU */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-stu-blue" />
+                  <span>Địa điểm hẹn gặp tại trường STU <span className="text-red-500">*</span></span>
+                </label>
+                <div className="relative">
+                  <select
+                    {...register('campusLocation')}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-stu-blue focus:ring-2 focus:ring-stu-blue/20 transition"
+                  >
+                    {CAMPUS_LOCATIONS.map((loc, idx) => (
+                      <option key={idx} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                  <MapPin className="w-4 h-4 text-stu-blue absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* 5.2 Khung giờ hẹn gặp */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-stu-blue" />
+                  <span>Khung giờ hẹn gặp thuận tiện <span className="text-red-500">*</span></span>
+                </label>
+                <div className="relative">
+                  <select
+                    {...register('meetupTime')}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-stu-blue focus:ring-2 focus:ring-stu-blue/20 transition"
+                  >
+                    {CAMPUS_MEETUP_TIMES.map((time, idx) => (
+                      <option key={idx} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </select>
+                  <Clock className="w-4 h-4 text-stu-blue absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
+
+            <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-              <span>Giao dịch trực tiếp tại khuôn viên STU giúp đảm bảo an toàn 100% cho sinh viên.</span>
+              <span>Giao dịch trực tiếp tại khuôn viên STU (180 Cao Lỗ) đúng khung giờ rảnh giúp hai bên xem đồ thuận lợi và đảm bảo an toàn 100%.</span>
             </p>
           </div>
 
