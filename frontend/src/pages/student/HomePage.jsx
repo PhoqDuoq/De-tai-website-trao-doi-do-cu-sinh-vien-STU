@@ -314,6 +314,14 @@ export function HomePage() {
                 {searchQuery
                   ? `Tìm thấy ${
                       (liveListings.length > 0 ? liveListings : sampleListings).filter((item) => {
+                        const isUnavailable =
+                          item.status === 'SOLD' ||
+                          item.status === 'TRADING' ||
+                          item.status === 'IN_TRANSACTION' ||
+                          item.status === 'RESERVED' ||
+                          item.status === 'PENDING_MEETUP' ||
+                          item.status === 'HIDDEN';
+                        if (isUnavailable) return false;
                         if (selectedCategoryId && item.categoryId !== selectedCategoryId && item.category_id !== selectedCategoryId) return false;
                         const q = searchQuery.toLowerCase().trim();
                         return (
@@ -355,6 +363,16 @@ export function HomePage() {
 
           {(() => {
             const displayListings = (liveListings.length > 0 ? liveListings : sampleListings).filter((item) => {
+              // Ẩn sản phẩm đã bán hoặc đang trong trạng thái giao dịch
+              const isUnavailable =
+                item.status === 'SOLD' ||
+                item.status === 'TRADING' ||
+                item.status === 'IN_TRANSACTION' ||
+                item.status === 'RESERVED' ||
+                item.status === 'PENDING_MEETUP' ||
+                item.status === 'HIDDEN';
+              if (isUnavailable) return false;
+
               if (selectedCategoryId && item.categoryId !== selectedCategoryId && item.category_id !== selectedCategoryId) {
                 return false;
               }

@@ -219,14 +219,14 @@ export function ListingDetailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-2.5 pt-2">
-              <Link to="/messages" className="block w-full">
+              <Link to={`/messages?listingId=${listing.id}`} className="block w-full">
                 <button className="w-full py-3 px-4 rounded-xl bg-stu-blue hover:bg-stu-darkBlue text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-xs cursor-pointer">
                   <MessageSquare className="w-4 h-4" />
                   <span>Nhắn tin thương lượng với người bán</span>
                 </button>
               </Link>
 
-              <Link to="/transactions" className="block w-full">
+              <Link to={`/transactions?listingId=${listing.id}`} className="block w-full">
                 <button className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-xs cursor-pointer">
                   <Handshake className="w-4 h-4" />
                   <span>Đề nghị hẹn gặp tại STU</span>

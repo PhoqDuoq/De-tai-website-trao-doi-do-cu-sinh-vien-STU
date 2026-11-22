@@ -61,8 +61,7 @@ async function authenticateToken(req, res, next) {
       return failure(res, 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.', 401);
     }
   } else {
-    // Demo fallback for guest calls: user #3
-    userId = 3;
+    return failure(res, 'Chưa đăng nhập hoặc phiên làm việc đã kết thúc. Vui lòng đăng nhập để tiếp tục.', 401);
   }
 
   // Real-time check against stu_identity_db.users in MySQL
@@ -143,14 +142,26 @@ async function initDatabaseDefaults() {
     const adminPassword = await bcrypt.hash('Admin@123456', 10);
 
     // 1. Create or ensure accounts in stu_identity_db
+    try {
+      await pool.query('ALTER TABLE stu_identity_db.user_verifications MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT "PENDING"');
+    } catch (e) {}
+
     await pool.query(`
       INSERT INTO stu_identity_db.users (id, student_id, email, password_hash, full_name, phone_number, role, status)
       VALUES 
       (1, 'DH52100123', 'admin@stu.edu.vn', '${adminPassword}', 'Quản Trị Viên STU', '0901234567', 'ADMIN', 'ACTIVE'),
       (2, 'DH52100456', 'moderator@stu.edu.vn', '${adminPassword}', 'Kiểm Duyệt Viên STU', '0902345678', 'MODERATOR', 'ACTIVE'),
-      (3, 'DH52201642', 'dh52201642@student.stu.edu.vn', '${defaultPassword}', 'Hà Thiên Phúc (SV STU)', '0903456789', 'STUDENT', 'ACTIVE'),
-      (4, 'DH52200413', 'dh52200413@student.stu.edu.vn', '${defaultPassword}', 'Dương Hoài Phong', '0904567890', 'STUDENT', 'ACTIVE')
-      ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
+      (3, 'DH52201642', 'dh52201642@student.stu.edu.vn', '${defaultPassword}', 'Hà Thiên Phúc (Người mua STU)', '0903456789', 'STUDENT', 'ACTIVE'),
+      (4, 'DH52200413', 'dh52200413@student.stu.edu.vn', '${defaultPassword}', 'Dương Hoài Phong (Người bán STU)', '0904567890', 'STUDENT', 'ACTIVE')
+      ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), password_hash = VALUES(password_hash), role = VALUES(role), status = VALUES(status);
+    `);
+
+    // Ensure student verifications
+    await pool.query(`
+      INSERT INTO stu_identity_db.user_verifications (user_id, student_card_image_url, status)
+      VALUES (3, 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300', 'APPROVED'),
+             (4, 'https://images.unsplash.com/photo-1517055729441-db3aab13588f?w=300', 'APPROVED')
+      ON DUPLICATE KEY UPDATE status = 'APPROVED';
     `);
 
     // 2. Sample listings in stu_listing_db
@@ -498,6 +509,11 @@ app.get('/api/v1/listings', async (req, res) => {
       LEFT JOIN stu_listing_db.categories c ON l.category_id = c.id
       LEFT JOIN stu_identity_db.users u ON l.seller_id = u.id
       WHERE l.status IN ('ACTIVE', 'PUBLISHED')
+        AND l.status NOT IN ('TRADING', 'IN_TRANSACTION', 'RESERVED', 'PENDING_MEETUP', 'SOLD', 'HIDDEN', 'BANNED')
+        AND l.id NOT IN (
+          SELECT DISTINCT listing_id FROM stu_transaction_db.transactions 
+          WHERE status IN ('ACCEPTED', 'IN_PROGRESS', 'CONFIRMED')
+        )
     `;
     const params = [];
 
@@ -515,7 +531,16 @@ app.get('/api/v1/listings', async (req, res) => {
     params.push(Number(size), Number(page) * Number(size));
 
     const [listings] = await pool.query(query, params);
-    const [countResult] = await pool.query("SELECT count(*) as total FROM stu_listing_db.listings WHERE status IN ('ACTIVE', 'PUBLISHED')");
+    const [countResult] = await pool.query(`
+      SELECT count(*) as total 
+      FROM stu_listing_db.listings l
+      WHERE l.status IN ('ACTIVE', 'PUBLISHED')
+        AND l.status NOT IN ('TRADING', 'IN_TRANSACTION', 'RESERVED', 'PENDING_MEETUP', 'SOLD', 'HIDDEN', 'BANNED')
+        AND l.id NOT IN (
+          SELECT DISTINCT listing_id FROM stu_transaction_db.transactions 
+          WHERE status IN ('ACCEPTED', 'IN_PROGRESS', 'CONFIRMED')
+        )
+    `);
 
     return success(res, {
       content: listings,
@@ -735,54 +760,203 @@ app.delete('/api/v1/favorites/:listingId', authenticateToken, async (req, res) =
 // 5. MESSAGES & 1-ON-1 CHAT
 // ==========================================
 
+// Get user conversations
 app.get('/api/v1/conversations', authenticateToken, async (req, res) => {
   try {
+    const currentUserId = req.user.id;
     const [convs] = await pool.query(
-      `SELECT c.*, l.title as listingTitle, l.price as listingPrice,
+      `SELECT c.id, c.listing_id as listingId, c.buyer_id as buyerId, c.seller_id as sellerId,
+              c.last_message_at as lastMessageAt, c.created_at as createdAt,
+              l.title as listingTitle, l.price as listingPrice,
               (SELECT image_url FROM stu_listing_db.listing_images WHERE listing_id = l.id LIMIT 1) as listingImage,
-              u1.full_name as buyerName, u2.full_name as sellerName
+              u1.full_name as buyerName, u1.student_id as buyerStudentCode,
+              u2.full_name as sellerName, u2.student_id as sellerStudentCode,
+              (SELECT content FROM stu_interaction_db.messages WHERE conversation_id = c.id ORDER BY id DESC LIMIT 1) as lastMessage,
+              (SELECT created_at FROM stu_interaction_db.messages WHERE conversation_id = c.id ORDER BY id DESC LIMIT 1) as lastMessageTime
        FROM stu_interaction_db.conversations c
        LEFT JOIN stu_listing_db.listings l ON c.listing_id = l.id
        LEFT JOIN stu_identity_db.users u1 ON c.buyer_id = u1.id
        LEFT JOIN stu_identity_db.users u2 ON c.seller_id = u2.id
        WHERE c.buyer_id = ? OR c.seller_id = ?
-       ORDER BY c.last_message_at DESC`,
-      [req.user.id, req.user.id]
+       ORDER BY c.last_message_at DESC, c.id DESC`,
+      [currentUserId, currentUserId]
     );
 
-    // If empty, return sample demo conversations
-    if (convs.length === 0) {
-      return success(res, [
-        {
-          id: 1,
-          partnerName: 'Lê Thảo Vy (DH52201456)',
-          listingTitle: 'Laptop Dell Latitude E5470',
-          lastMessage: 'Bạn có bớt thêm chút xăng xe cho sinh viên STU không? Mình qua cổng 180 Cao Lỗ xem máy luôn.',
-          lastTime: '14:20',
-          unread: 1,
-          listingPrice: 3500000,
-        },
-        {
-          id: 2,
-          partnerName: 'Trần Hoài Phong (DH52100889)',
-          listingTitle: 'Tai nghe Gaming Havit H2002d',
-          lastMessage: 'Còn đầy đủ mic rời với hộp luôn bạn ơi, mai 9h sáng mình có tiết ở khu C STU nè.',
-          lastTime: 'Hôm qua',
-          unread: 0,
-          listingPrice: 350000,
-        },
-        {
-          id: 3,
-          partnerName: 'Phạm Gia Bảo (DH52003312)',
-          listingTitle: 'Bộ sách CNTT (Cấu trúc dữ liệu, Java)',
-          lastMessage: 'Mình lấy trọn bộ sách nhé, chiều nay 4h30 gặp ở thư viện STU nha!',
-          lastTime: '10:05',
-          unread: 0,
-          listingPrice: 250000,
-        },
-      ]);
+    const formatted = convs.map((c) => {
+      const isBuyer = c.buyerId === currentUserId;
+      const partnerName = isBuyer ? c.sellerName : c.buyerName;
+      const partnerRole = isBuyer ? 'Người bán' : 'Người mua';
+      const partnerCode = isBuyer ? c.sellerStudentCode : c.buyerStudentCode;
+      return {
+        ...c,
+        isBuyer,
+        partnerName: partnerName ? `${partnerName} (${partnerRole})` : (isBuyer ? 'Người bán STU' : 'Người mua STU'),
+        rawPartnerName: partnerName || (isBuyer ? 'Người bán STU' : 'Người mua STU'),
+        partnerRole,
+        partnerCode,
+        initial: (partnerName || 'SV').split(' ').pop().slice(0, 2).toUpperCase(),
+        time: c.lastMessageTime
+          ? new Date(c.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : 'Mới tạo',
+      };
+    });
+
+    return success(res, formatted);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Create or get conversation for a listing
+app.post('/api/v1/conversations', authenticateToken, async (req, res) => {
+  try {
+    const { listingId } = req.body;
+    if (!listingId) return failure(res, 'Vui lòng cung cấp mã sản phẩm (listingId)');
+
+    const [listings] = await pool.query(
+      `SELECT l.id, l.seller_id, l.title, l.price,
+              (SELECT image_url FROM stu_listing_db.listing_images WHERE listing_id = l.id LIMIT 1) as listingImage,
+              u.full_name as sellerName, u.student_id as sellerStudentCode
+       FROM stu_listing_db.listings l
+       LEFT JOIN stu_identity_db.users u ON l.seller_id = u.id
+       WHERE l.id = ?`,
+      [listingId]
+    );
+
+    if (listings.length === 0) return failure(res, 'Sản phẩm không tồn tại trên sàn STU', 404);
+    const listing = listings[0];
+    const buyerId = req.user.id;
+    const sellerId = listing.seller_id;
+
+    if (buyerId === sellerId) {
+      return failure(res, 'Bạn không thể tự nhắn tin cho sản phẩm do chính bạn đăng bán');
     }
-    return success(res, convs);
+
+    // Check if conversation already exists
+    const [existing] = await pool.query(
+      `SELECT id FROM stu_interaction_db.conversations
+       WHERE listing_id = ? AND buyer_id = ? AND seller_id = ?`,
+      [listingId, buyerId, sellerId]
+    );
+
+    let convId;
+    if (existing.length > 0) {
+      convId = existing[0].id;
+    } else {
+      const [insertRes] = await pool.query(
+        `INSERT INTO stu_interaction_db.conversations (listing_id, buyer_id, seller_id, last_message_at)
+         VALUES (?, ?, ?, NOW())`,
+        [listingId, buyerId, sellerId]
+      );
+      convId = insertRes.insertId;
+    }
+
+    return success(res, {
+      id: convId,
+      listingId: listing.id,
+      buyerId,
+      sellerId,
+      listingTitle: listing.title,
+      listingPrice: listing.price,
+      listingImage: listing.listingImage,
+      partnerName: `${listing.sellerName} (Người bán)`,
+      isBuyer: true,
+    }, 'Khởi tạo cuộc trò chuyện thành công');
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Get messages in a conversation
+app.get('/api/v1/conversations/:id/messages', authenticateToken, async (req, res) => {
+  try {
+    const convId = req.params.id;
+    const [convs] = await pool.query(
+      'SELECT buyer_id, seller_id FROM stu_interaction_db.conversations WHERE id = ?',
+      [convId]
+    );
+    if (convs.length === 0) return failure(res, 'Hội thoại không tồn tại', 404);
+    const conv = convs[0];
+    if (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id) {
+      return failure(res, 'Bạn không có quyền truy cập hội thoại này', 403);
+    }
+
+    const [messages] = await pool.query(
+      `SELECT m.id, m.conversation_id, m.sender_id, m.message_type, m.content as text,
+              m.created_at, u.full_name as senderName
+       FROM stu_interaction_db.messages m
+       LEFT JOIN stu_identity_db.users u ON m.sender_id = u.id
+       WHERE m.conversation_id = ?
+       ORDER BY m.id ASC`,
+      [convId]
+    );
+
+    const mapped = messages.map((m) => ({
+      id: m.id,
+      senderId: m.sender_id,
+      sender: m.sender_id === req.user.id ? 'me' : 'them',
+      senderName: m.senderName,
+      text: m.text,
+      time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: m.created_at,
+    }));
+
+    return success(res, mapped);
+  } catch (err) {
+    return failure(res, err.message, 500);
+  }
+});
+
+// Send a message
+app.post('/api/v1/conversations/:id/messages', authenticateToken, async (req, res) => {
+  try {
+    const convId = req.params.id;
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return failure(res, 'Nội dung tin nhắn không được để trống');
+    }
+
+    const [convs] = await pool.query(
+      `SELECT c.*, l.title as listingTitle
+       FROM stu_interaction_db.conversations c
+       LEFT JOIN stu_listing_db.listings l ON c.listing_id = l.id
+       WHERE c.id = ?`,
+      [convId]
+    );
+    if (convs.length === 0) return failure(res, 'Hội thoại không tồn tại', 404);
+    const conv = convs[0];
+    if (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id) {
+      return failure(res, 'Bạn không có quyền gửi tin nhắn trong hội thoại này', 403);
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO stu_interaction_db.messages (conversation_id, sender_id, message_type, content)
+       VALUES (?, ?, 'TEXT', ?)`,
+      [convId, req.user.id, content.trim()]
+    );
+
+    await pool.query('UPDATE stu_interaction_db.conversations SET last_message_at = NOW() WHERE id = ?', [convId]);
+
+    // Send notification to recipient
+    const recipientId = (conv.buyer_id === req.user.id) ? conv.seller_id : conv.buyer_id;
+    try {
+      await pool.query(
+        `INSERT INTO stu_interaction_db.notifications (user_id, title, content, type, link_url)
+         VALUES (?, 'Tin nhắn trao đổi mới từ bạn học', ?, 'MESSAGE', '/messages')`,
+        [recipientId, `${req.user.fullName} đã gửi tin nhắn: "${content.trim().slice(0, 80)}"`]
+      );
+    } catch (notifErr) {}
+
+    return success(res, {
+      id: result.insertId,
+      conversationId: convId,
+      senderId: req.user.id,
+      sender: 'me',
+      senderName: req.user.fullName,
+      text: content.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
+    }, 'Gửi tin nhắn thành công');
   } catch (err) {
     return failure(res, err.message, 500);
   }
@@ -794,59 +968,34 @@ app.get('/api/v1/conversations', authenticateToken, async (req, res) => {
 
 app.get('/api/v1/transactions', authenticateToken, async (req, res) => {
   try {
+    const currentUserId = req.user.id;
     const [txs] = await pool.query(
-      `SELECT t.*, l.title as listingTitle,
+      `SELECT t.*, l.title as listingTitle, l.price as listingOriginalPrice,
               (SELECT image_url FROM stu_listing_db.listing_images WHERE listing_id = l.id LIMIT 1) as listingImage,
-              u1.full_name as buyerName, u2.full_name as sellerName
+              u1.full_name as buyerName, u1.student_id as buyerStudentCode,
+              u2.full_name as sellerName, u2.student_id as sellerStudentCode
        FROM stu_transaction_db.transactions t
        LEFT JOIN stu_listing_db.listings l ON t.listing_id = l.id
        LEFT JOIN stu_identity_db.users u1 ON t.buyer_id = u1.id
        LEFT JOIN stu_identity_db.users u2 ON t.seller_id = u2.id
        WHERE t.buyer_id = ? OR t.seller_id = ?
        ORDER BY t.id DESC`,
-      [req.user.id, req.user.id]
+      [currentUserId, currentUserId]
     );
 
-    // If empty, return structured sample transactions
-    if (txs.length === 0) {
-      return success(res, [
-        {
-          id: 1,
-          transaction_code: 'TX-STU-8841',
-          listingTitle: 'Laptop Dell Latitude E5470 (Core i5, RAM 8GB)',
-          partnerName: 'Lê Thảo Vy (DH52201456)',
-          agreed_price: 3350000,
-          meeting_location: 'Sảnh A - Tòa nhà Trung tâm STU',
-          meeting_time: '14:30 Chiều nay',
-          status: 'REQUESTED',
-          listingImage: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?auto=format&fit=crop&w=200&q=80',
-        },
-        {
-          id: 2,
-          transaction_code: 'TX-STU-8839',
-          listingTitle: 'Tai nghe Gaming Havit H2002d',
-          partnerName: 'Trần Hoài Phong (DH52100889)',
-          agreed_price: 320000,
-          meeting_location: 'Căn tin trường STU (Khu B)',
-          meeting_time: '09:00 Sáng mai',
-          status: 'ACCEPTED',
-          listingImage: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?auto=format&fit=crop&w=200&q=80',
-        },
-        {
-          id: 3,
-          transaction_code: 'TX-STU-8820',
-          listingTitle: 'Giáo trình Lập trình Web & Ứng dụng STU',
-          partnerName: 'Phạm Gia Bảo (DH52003312)',
-          agreed_price: 35000,
-          meeting_location: 'Thư viện tầng 3 - Tòa nhà A',
-          meeting_time: 'Hôm qua',
-          status: 'COMPLETED',
-          listingImage: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=200&q=80',
-        },
-      ]);
-    }
+    const formatted = txs.map((t) => {
+      const isBuyer = t.buyer_id === currentUserId;
+      const partnerName = isBuyer
+        ? (t.sellerName ? `${t.sellerName} (${t.sellerStudentCode || 'Người bán'})` : 'Người bán STU')
+        : (t.buyerName ? `${t.buyerName} (${t.buyerStudentCode || 'Người mua'})` : 'Người mua STU');
+      return {
+        ...t,
+        isBuyer,
+        partnerName,
+      };
+    });
 
-    return success(res, txs);
+    return success(res, formatted);
   } catch (err) {
     return failure(res, err.message, 500);
   }
@@ -855,11 +1004,38 @@ app.get('/api/v1/transactions', authenticateToken, async (req, res) => {
 app.patch('/api/v1/transactions/:id/status', authenticateToken, async (req, res) => {
   try {
     const { status } = req.body;
+    const txId = req.params.id;
+
     await pool.query(
       'UPDATE stu_transaction_db.transactions SET status = ? WHERE id = ?',
-      [status, req.params.id]
+      [status, txId]
     );
-    return success(res, { id: req.params.id, status }, 'Cập nhật trạng thái giao dịch thành công!');
+
+    // Sync listing status:
+    // If ACCEPTED -> listing becomes TRADING (hidden from public browsing)
+    // If COMPLETED -> listing becomes SOLD
+    // If CANCELLED -> restore listing to ACTIVE
+    if (status === 'ACCEPTED') {
+      await pool.query(
+        `UPDATE stu_listing_db.listings SET status = 'TRADING'
+         WHERE id = (SELECT listing_id FROM stu_transaction_db.transactions WHERE id = ?)`,
+        [txId]
+      );
+    } else if (status === 'COMPLETED') {
+      await pool.query(
+        `UPDATE stu_listing_db.listings SET status = 'SOLD'
+         WHERE id = (SELECT listing_id FROM stu_transaction_db.transactions WHERE id = ?)`,
+        [txId]
+      );
+    } else if (status === 'CANCELLED') {
+      await pool.query(
+        `UPDATE stu_listing_db.listings SET status = 'ACTIVE'
+         WHERE id = (SELECT listing_id FROM stu_transaction_db.transactions WHERE id = ?)`,
+        [txId]
+      );
+    }
+
+    return success(res, { id: txId, status }, 'Cập nhật trạng thái giao dịch thành công!');
   } catch (err) {
     return failure(res, err.message, 500);
   }

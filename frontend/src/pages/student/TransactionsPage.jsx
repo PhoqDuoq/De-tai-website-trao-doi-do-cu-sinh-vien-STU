@@ -156,6 +156,10 @@ export function TransactionsPage() {
     return matchesSearch;
   });
 
+  const totalCompletedValue = transactions
+    .filter((t) => t.status === 'COMPLETED')
+    .reduce((sum, t) => sum + Number(t.agreed_price || t.price || 0), 0);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'REQUESTED':
@@ -496,7 +500,7 @@ export function TransactionsPage() {
             </div>
             <div className="bg-emerald-50 border border-emerald-200 px-5 py-3 rounded-2xl text-right">
               <div className="text-[11px] font-bold text-emerald-700">Tổng giá trị giao dịch hoàn tất</div>
-              <div className="text-2xl font-black text-emerald-700">3.735.000 đ</div>
+              <div className="text-2xl font-black text-emerald-700">{formatVND(totalCompletedValue)}</div>
             </div>
           </div>
 
@@ -538,8 +542,19 @@ export function TransactionsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                  {filteredHistoryTxs.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition">
+                  {filteredHistoryTxs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <Handshake className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                        <p className="text-sm font-semibold text-slate-600">Bạn chưa có lịch sử giao dịch nào</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Khi bạn tạo lịch hẹn hoặc có sinh viên hẹn mua đồ của bạn, thông tin biên lai sẽ lưu trữ tại đây.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHistoryTxs.map((t) => (
+                      <tr key={t.id} className="hover:bg-slate-50 transition">
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="font-mono font-bold text-xs text-stu-blue">
                           {t.transaction_code || `TX-STU-${t.id}`}
@@ -585,7 +600,7 @@ export function TransactionsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
