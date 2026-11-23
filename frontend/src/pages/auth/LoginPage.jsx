@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Sparkles, GraduationCap, ShieldCheck, ShieldAlert, ShoppingBag, Store } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Sparkles, GraduationCap, ShieldCheck, ShieldAlert, ShoppingBag, Store, UserCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { extractErrorMessage, clearAuthData } from '@/api/client';
@@ -188,7 +188,7 @@ export function LoginPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -224,6 +224,25 @@ export function LoginPage() {
                 </div>
                 <div className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-mono font-bold mt-1 inline-block">
                   DH52200413
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin('dh52201229@gmail.com', 'Stu@123456', '/my-listings')
+                }
+                className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-left transition cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 text-purple-700 font-bold text-xs">
+                  <UserCheck className="w-4 h-4 shrink-0" />
+                  <span>Duyệt tin (Demo)</span>
+                </div>
+                <div className="text-[10px] text-slate-600 font-semibold mt-0.5 truncate">
+                  Nguyễn Trung Hậu
+                </div>
+                <div className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded font-mono font-bold mt-1 inline-block">
+                  DH52201228
                 </div>
               </button>
 
