@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldAlert,
@@ -15,12 +15,35 @@ import {
   ClipboardCheck,
   AlertTriangle,
 } from 'lucide-react';
+import { apiClient } from '@/api/client';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { RoleBadge } from '@/components/ui/Badge';
 import { formatVND } from '@/lib/utils';
 
 export function AdminDashboard() {
+  const [analytics, setAnalytics] = useState(null);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await apiClient.get('/api/v1/admin/analytics/details');
+        if (res?.data?.data) {
+          setAnalytics(res.data.data);
+        }
+      } catch (err) {
+        console.warn('Could not fetch admin overview analytics:', err);
+      }
+    };
+    fetchAnalytics();
+  }, []);
+
+  const totalUsers = analytics?.kpis?.users?.totalUsers ?? 8;
+  const verifiedCount = analytics?.kpis?.verifications?.verifiedCount ?? 5;
+  const totalListings = analytics?.kpis?.listings?.totalListings ?? 50;
+  const activeListings = analytics?.kpis?.listings?.activeListings ?? 47;
+  const totalRevenue = analytics?.kpis?.billing?.totalRevenue ? Number(analytics.kpis.billing.totalRevenue) : 0;
+
   const serviceStatus = [
     { name: 'API Gateway', port: 8080, db: '-', status: 'UP' },
     { name: 'Identity Service', port: 8081, db: 'stu_identity_db', status: 'UP' },
@@ -57,8 +80,8 @@ export function AdminDashboard() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng người dùng STU</p>
-              <h3 className="text-2xl font-black text-slate-900 mt-1">128</h3>
-              <p className="text-[11px] text-emerald-600 mt-0.5">92 sinh viên đã xác minh</p>
+              <h3 className="text-2xl font-black text-slate-900 mt-1">{totalUsers}</h3>
+              <p className="text-[11px] text-emerald-600 mt-0.5">{verifiedCount} sinh viên đã xác minh</p>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
               <Users className="w-6 h-6" />
@@ -70,8 +93,8 @@ export function AdminDashboard() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tin đăng toàn sàn</p>
-              <h3 className="text-2xl font-black text-stu-blue mt-1">45</h3>
-              <p className="text-[11px] text-blue-600 mt-0.5">38 tin đang hoạt động</p>
+              <h3 className="text-2xl font-black text-stu-blue mt-1">{totalListings}</h3>
+              <p className="text-[11px] text-blue-600 mt-0.5">{activeListings} tin đang hoạt động</p>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-stu-blue flex items-center justify-center">
               <Layers className="w-6 h-6" />
@@ -83,7 +106,7 @@ export function AdminDashboard() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Doanh thu phí niêm yết</p>
-              <h3 className="text-2xl font-black text-emerald-700 mt-1">{formatVND(650000)}</h3>
+              <h3 className="text-2xl font-black text-emerald-700 mt-1">{formatVND(totalRevenue)}</h3>
               <p className="text-[11px] text-emerald-600 mt-0.5">Gói đẩy bài & duy trì nền tảng</p>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
