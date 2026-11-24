@@ -27,28 +27,28 @@ export function PostingFeePage() {
   const [packages, setPackages] = useState([
     {
       id: 1,
-      name: 'Tin đăng tiêu chuẩn Sinh viên STU',
+      name: 'Gói Sinh viên Tiêu chuẩn',
       duration: 'Hiển thị 30 ngày',
       price: 0,
-      description: 'Miễn phí 100% cho sinh viên STU đăng bán giáo trình và đồ dùng học tập cá nhân.',
+      description: 'Đăng tin miễn phí không giới hạn cho sinh viên STU.',
       badge: 'Miễn phí SV',
       popular: false,
     },
     {
       id: 2,
-      name: 'Gói Ưu tiên tìm kiếm ngành STU',
-      duration: 'Hiển thị 5 ngày',
+      name: 'Gói Đẩy Tin Nổi Bật 3 Ngày',
+      duration: 'Hiển thị 3 ngày',
       price: 10000,
-      description: 'Đưa tin lên đầu danh mục khi bạn học cùng khoa lọc đồ dùng học tập liên quan.',
+      description: 'Ghim ưu tiên đầu danh mục khi bạn học cùng khoa lọc đồ dùng học tập liên quan.',
       badge: 'Bán nhanh',
       popular: false,
     },
     {
       id: 3,
-      name: 'Gói Tin đăng nổi bật Trang chủ STU',
+      name: 'Gói Đẩy Tin Nổi Bật 7 Ngày',
       duration: 'Hiển thị 7 ngày',
       price: 15000,
-      description: 'Xuất hiện ngay banner "Tin đăng nổi bật" trên trang chủ kèm huy hiệu nổi bật ưu tiên.',
+      description: 'Ghim trang chủ STU Market 7 ngày kèm huy hiệu nổi bật ưu tiên.',
       badge: 'Được chuộng nhất',
       popular: true,
     },
@@ -56,6 +56,30 @@ export function PostingFeePage() {
 
   const [selectedPackage, setSelectedPackage] = useState(packages[2]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    const fetchBillingPackages = async () => {
+      try {
+        const res = await apiClient.get('/api/v1/billing/packages');
+        if (res?.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const mapped = res.data.data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            duration: `Hiển thị ${p.duration_days} ngày`,
+            price: Number(p.price),
+            description: p.description,
+            badge: Number(p.price) === 0 ? 'Miễn phí SV' : (p.duration_days >= 7 ? 'Được chuộng nhất' : 'Bán nhanh'),
+            popular: p.duration_days >= 7,
+          }));
+          setPackages(mapped);
+          setSelectedPackage(mapped[mapped.length - 1]);
+        }
+      } catch (err) {
+        console.warn('Could not load billing packages from API:', err);
+      }
+    };
+    fetchBillingPackages();
+  }, []);
 
   const handleConfirmPayment = async () => {
     setIsProcessing(true);

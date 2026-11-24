@@ -37,16 +37,17 @@ export function ProfilePage() {
 
   // Profile Form state
   const [formData, setFormData] = useState({
-    fullName: user?.fullName || 'Hà Thiên Phúc (SV STU)',
-    studentCode: user?.studentCode || 'DH52201642',
-    email: user?.email || 'dh52201642@student.stu.edu.vn',
+    fullName: user?.fullName || '',
+    studentCode: user?.studentCode || '',
+    email: user?.email || '',
     faculty: 'Công nghệ Thông tin',
     studentClass: 'D22_TH01',
-    phone: user?.phone || '0903 456 789',
-    bio: 'Sinh viên năm cuối ngành Công nghệ Thông tin - STU. Mình thường xuyên thanh lý giáo trình, laptop, linh kiện điện tử và đồ dùng học tập giá hạt dẻ cho các bạn sinh viên khoá dưới.',
+    phone: user?.phone || '',
+    bio: 'Sinh viên Trường Đại học Công nghệ Sài Gòn (STU). Sàn thương mại điện tử trao đổi đồ dùng học tập nội bộ.',
   });
 
   const [myListings, setMyListings] = useState([]);
+  const [reviews, setReviews] = useState([]);
 
   useEffect(() => {
     // Fetch profile and listings
@@ -62,6 +63,16 @@ export function ProfilePage() {
             studentCode: u.studentCode || prev.studentCode,
             email: u.email || prev.email,
           }));
+
+          // Fetch reviews for this user
+          try {
+            const resReviews = await apiClient.get(`/api/v1/users/${u.id}/reviews`);
+            if (resReviews?.data?.data && Array.isArray(resReviews.data.data)) {
+              setReviews(resReviews.data.data);
+            }
+          } catch (rErr) {
+            console.warn('Could not load reviews:', rErr);
+          }
         }
       } catch (err) {
         console.warn('Could not load profile from API:', err);
@@ -427,111 +438,98 @@ export function ProfilePage() {
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-stu-blue" />
-              <span>Đồ dùng đang đăng bán ({myListings.length > 0 ? myListings.length : 2})</span>
+              <span>Đồ dùng đang đăng bán ({myListings.length})</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {(myListings.length > 0
-                ? myListings
-                : [
-                    {
-                      id: 101,
-                      title: 'Laptop Dell Latitude E5470 (Core i5, RAM 8GB, SSD 256GB)',
-                      price: 3350000,
-                      primaryImageUrl:
-                        'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?auto=format&fit=crop&w=600&q=80',
-                      location_notes: 'Sảnh A - STU',
-                    },
-                    {
-                      id: 102,
-                      title: 'Bộ sách CNTT (Cấu trúc dữ liệu, Java, CSDL)',
-                      price: 250000,
-                      primaryImageUrl:
-                        'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80',
-                      location_notes: 'Thư viện STU',
-                    },
-                  ]
-              ).map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition group flex flex-col"
-                >
-                  <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-                    <img
-                      src={
-                        item.primaryImageUrl ||
-                        'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80'
-                      }
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                    <span className="absolute bottom-2.5 left-2.5 bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                      Còn giao dịch
-                    </span>
-                  </div>
-
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm line-clamp-2">{item.title}</h4>
-                      <div className="text-stu-orange font-black text-base mt-1">
-                        {formatVND(item.price)}
+            {myListings.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-8 text-center space-y-3 shadow-xs">
+                <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-700">Chưa có bài đăng bán nào</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Bạn có thể đăng sách, giáo trình hoặc thiết bị học tập cũ để thanh lý cho các bạn sinh viên cùng trường STU.
+                </p>
+                <Link to="/listings/create">
+                  <Button variant="accent" size="sm">Đăng tin thanh lý ngay</Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myListings.map((item) => (
+                  <Link key={item.id} to={`/listings/${item.id}`} className="group block">
+                    <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition group flex flex-col h-full">
+                      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+                        <img
+                          src={
+                            item.primaryImageUrl ||
+                            'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80'
+                          }
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <span className="absolute bottom-2.5 left-2.5 bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                          {item.status === 'ACTIVE' ? 'Đang hiển thị' : item.status === 'PENDING_APPROVAL' ? 'Chờ duyệt' : item.status === 'TRADING' ? 'Đang hẹn gặp' : 'Đã bán'}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                        <Building className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{item.location_notes || 'Khuôn viên trường STU'}</span>
+
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-sm line-clamp-2 group-hover:text-stu-blue transition-colors">{item.title}</h4>
+                          <div className="text-stu-orange font-black text-base mt-1">
+                            {formatVND(item.price)}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                            <Building className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{item.location_notes || 'Khuôn viên trường STU'}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-700">{formData.fullName || 'Sinh viên STU'}</span>
+                          <span className="text-xs font-bold text-amber-500 flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> 5.0
+                          </span>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">{formData.fullName}</span>
-                      <span className="text-xs font-bold text-amber-500 flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> 4.9
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Student Reviews */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              <span>Đánh giá từ bạn học đã nhận đồ tại STU (28 đánh giá)</span>
+              <span>Đánh giá từ bạn học đã nhận đồ tại STU ({reviews.length} đánh giá)</span>
             </h3>
 
-            <div className="space-y-3">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">
-                    Phạm Gia Bảo • Khoa Công nghệ Thực phẩm
-                  </span>
-                  <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" /> 5.0
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Sách photo còn rất mới, bạn nhiệt tình tặng kèm file đề cương và bài tập mẫu ôn thi môn
-                  Cấu trúc dữ liệu. Hẹn ngay sảnh A STU giao hàng rất đúng giờ.
+            {reviews.length === 0 ? (
+              <div className="p-6 text-center text-slate-500 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                <p className="text-xs font-medium text-slate-600">Chưa có đánh giá nào từ bạn học</p>
+                <p className="text-[11px] text-slate-400">
+                  Sau khi hoàn tất trao đổi đồ dùng học tập tại trường STU, phản hồi của người mua sẽ được hiển thị công khai tại đây.
                 </p>
               </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">
-                    Lê Thảo Vy • Khoa Quản trị Kinh doanh
-                  </span>
-                  <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" /> 5.0
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Máy laptop test pin và bàn phím rất kỹ tại căn tin khu B, bạn hướng dẫn tận tình cách cài
-                  Windows. Rất uy tín!
-                </p>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">
+                        {rev.reviewerName || 'Sinh viên STU'} • {rev.reviewerStudentCode || 'STU'}
+                      </span>
+                      <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
+                        <Star className="w-3.5 h-3.5 fill-amber-400" /> {Number(rev.rating || 5).toFixed(1)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {rev.comment}
+                    </p>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
